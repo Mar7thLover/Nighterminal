@@ -24,7 +24,10 @@ export function nightfallTheme(): ITheme {
     cursor: cssVar("--term-cursor", "#5ef2ff"),
     cursorAccent: cssVar("--term-cursor-ink", "#05060b"),
     selectionBackground: cssVar("--term-selection", "rgba(94,242,255,0.24)"),
-    selectionInactiveBackground: "rgba(94, 242, 255, 0.12)",
+    selectionInactiveBackground: cssVar(
+      "--term-selection-dim",
+      "rgba(94,242,255,0.12)",
+    ),
 
     black: cssVar("--ansi-black", "#12141f"),
     red: cssVar("--ansi-red", "#ff5e7a"),

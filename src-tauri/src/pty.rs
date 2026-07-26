@@ -29,6 +29,14 @@ pub struct Session {
     pump: Arc<Pump>,
 }
 
+impl Drop for Session {
+    fn drop(&mut self) {
+        // Lets the flusher of a session that was killed before the frontend
+        // ever attached notice and exit; see the flush loop.
+        self.pump.closed.store(true, Ordering::Release);
+    }
+}
+
 #[derive(Default)]
 pub struct PtyState(pub Mutex<HashMap<String, Session>>);
 
@@ -53,6 +61,10 @@ struct Pump {
     /// shell can print its prompt before the `listen()` round-trip completes,
     /// and those first bytes would otherwise be dropped on the floor.
     attached: AtomicBool,
+    /// Set when the `Session` is dropped (killed or reaped). The flusher's exit
+    /// path runs behind the `attached` gate, so a session the frontend never
+    /// attached needs this to know its loop is pointless.
+    closed: AtomicBool,
 }
 
 // ---------------------------------------------------------------- utf-8 seam
@@ -203,6 +215,7 @@ pub fn pty_spawn(
         text: Mutex::new(String::new()),
         running: AtomicBool::new(true),
         attached: AtomicBool::new(false),
+        closed: AtomicBool::new(false),
     });
 
     // Waiter: the authoritative "shell is gone" signal.
@@ -257,6 +270,12 @@ pub fn pty_spawn(
             .spawn(move || loop {
                 std::thread::sleep(FLUSH_INTERVAL);
                 if !pump.attached.load(Ordering::Acquire) {
+                    // The frontend may never attach — it was disposed mid-spawn
+                    // and called pty_kill instead. Without this check the loop
+                    // would spin at 8ms for the life of the process.
+                    if pump.closed.load(Ordering::Acquire) {
+                        break;
+                    }
                     continue;
                 }
                 let chunk = match pump.text.lock() {

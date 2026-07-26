@@ -26,11 +26,7 @@
   flex-direction: column;
   transform: translateX(102%);
   transition: transform 0.32s var(--ease-out);
-  background: linear-gradient(
-    200deg,
-    rgba(24, 26, 44, 0.9),
-    rgba(12, 13, 24, 0.92)
-  );
+  background: linear-gradient(200deg, var(--sheet-hi), var(--sheet-lo));
   backdrop-filter: blur(26px) saturate(1.3);
   border-left: 1px solid var(--line-strong);
   box-shadow: -24px 0 60px -30px rgba(0, 0, 0, 0.9);
@@ -79,7 +75,7 @@
 }
 
 #settings .close:hover {
-  background: rgba(255, 94, 122, 0.75);
+  background: rgb(from var(--danger) r g b / 0.75);
   color: #fff;
 }
 
@@ -90,7 +86,7 @@
   overscroll-behavior: contain;
   padding: 6px 18px 18px;
   scrollbar-width: thin;
-  scrollbar-color: rgba(94, 242, 255, 0.28) transparent;
+  scrollbar-color: rgb(from var(--accent) r g b / 0.28) transparent;
 }
 
 #settings .group {
@@ -103,7 +99,7 @@
   font-weight: 600;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: var(--neon-cyan);
+  color: var(--accent);
   opacity: 0.75;
 }
 
@@ -112,7 +108,7 @@
   align-items: center;
   gap: 12px;
   padding: 9px 0;
-  border-bottom: 1px solid rgba(150, 170, 230, 0.06);
+  border-bottom: 1px solid rgb(from var(--hairline-ink) r g b / 0.06);
 }
 
 #settings .row .text {
@@ -145,7 +141,7 @@
   padding: 0 8px;
   border: 1px solid var(--line-strong);
   border-radius: 7px;
-  background: rgba(6, 7, 14, 0.55);
+  background: rgb(from var(--well-ink) r g b / 0.55);
   color: var(--fg);
   font-family: var(--font-mono);
   font-size: 11px;
@@ -162,8 +158,8 @@
 
 #settings input:focus,
 #settings select:focus {
-  border-color: rgba(94, 242, 255, 0.5);
-  box-shadow: 0 0 0 3px rgba(94, 242, 255, 0.1);
+  border-color: rgb(from var(--accent) r g b / 0.5);
+  box-shadow: 0 0 0 3px rgb(from var(--accent) r g b / 0.1);
 }
 
 #settings input.hotkey {
@@ -188,8 +184,8 @@
   border-radius: 2px;
   background: linear-gradient(
     90deg,
-    rgba(94, 242, 255, 0.55),
-    rgba(160, 107, 255, 0.55)
+    rgb(from var(--accent) r g b / 0.55),
+    rgb(from var(--accent-2) r g b / 0.55)
   );
   outline: none;
 }
@@ -200,7 +196,7 @@
   height: 13px;
   border-radius: 50%;
   background: var(--fg);
-  box-shadow: 0 0 10px -2px var(--neon-cyan);
+  box-shadow: 0 0 10px -2px var(--accent);
   cursor: pointer;
 }
 
@@ -220,7 +216,7 @@
   height: 21px;
   border: 1px solid var(--line-strong);
   border-radius: 99px;
-  background: rgba(6, 7, 14, 0.6);
+  background: rgb(from var(--well-ink) r g b / 0.6);
   transition:
     background 0.2s ease,
     border-color 0.2s ease,
@@ -242,15 +238,15 @@
 }
 
 #settings .switch.on {
-  border-color: rgba(94, 242, 255, 0.45);
-  background: rgba(94, 242, 255, 0.16);
-  box-shadow: inset 0 0 12px -6px var(--neon-cyan);
+  border-color: rgb(from var(--accent) r g b / 0.45);
+  background: rgb(from var(--accent) r g b / 0.16);
+  box-shadow: inset 0 0 12px -6px var(--accent);
 }
 
 #settings .switch.on::after {
   transform: translateX(17px);
-  background: var(--neon-cyan);
-  box-shadow: 0 0 10px -1px var(--neon-cyan);
+  background: var(--accent);
+  box-shadow: 0 0 10px -1px var(--accent);
 }
 
 #settings footer {

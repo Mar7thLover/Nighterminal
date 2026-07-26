@@ -19,15 +19,15 @@
   display: grid;
   place-items: center;
   border-radius: 8px;
-  color: var(--neon-cyan);
+  color: var(--accent);
   background: linear-gradient(
     140deg,
-    rgba(94, 242, 255, 0.14),
-    rgba(160, 107, 255, 0.14)
+    rgb(from var(--accent) r g b / 0.14),
+    rgb(from var(--accent-2) r g b / 0.14)
   );
   box-shadow:
-    inset 0 0 0 1px rgba(94, 242, 255, 0.26),
-    0 0 16px -6px rgba(94, 242, 255, 0.8);
+    inset 0 0 0 1px rgb(from var(--accent) r g b / 0.26),
+    0 0 16px -6px rgb(from var(--accent) r g b / 0.8);
 }
 
 /* ---------------------------------------------------------------- tab strip */
@@ -55,12 +55,12 @@
   transform: translate3d(0, -50%, 0);
   background: linear-gradient(
     135deg,
-    rgba(94, 242, 255, 0.17),
-    rgba(160, 107, 255, 0.17)
+    rgb(from var(--accent) r g b / 0.17),
+    rgb(from var(--accent-2) r g b / 0.17)
   );
   box-shadow:
-    inset 0 0 0 1px rgba(94, 242, 255, 0.3),
-    0 2px 18px -6px rgba(94, 242, 255, 0.75);
+    inset 0 0 0 1px rgb(from var(--accent) r g b / 0.3),
+    0 2px 18px -6px rgb(from var(--accent) r g b / 0.75);
   transition:
     transform 0.34s var(--ease-out),
     width 0.34s var(--ease-out),
@@ -90,7 +90,7 @@
 
 .tab:hover {
   color: var(--fg);
-  background: rgba(150, 170, 230, 0.06);
+  background: rgb(from var(--hairline-ink) r g b / 0.06);
 }
 
 .tab.active {
@@ -110,13 +110,13 @@
 }
 
 .tab.active .dot {
-  background: var(--neon-cyan);
-  box-shadow: 0 0 8px var(--neon-cyan);
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent);
 }
 
 .tab.dead .dot {
   background: var(--danger);
-  box-shadow: 0 0 8px rgba(255, 94, 122, 0.7);
+  box-shadow: 0 0 8px rgb(from var(--danger) r g b / 0.7);
 }
 
 .tab .label {
@@ -150,7 +150,7 @@
 }
 
 .tab .close:hover {
-  background: rgba(255, 94, 122, 0.2);
+  background: rgb(from var(--danger) r g b / 0.2);
   color: #fff;
 }
 
@@ -201,9 +201,9 @@
 }
 
 .icon-btn:hover {
-  color: var(--neon-cyan);
-  background: rgba(94, 242, 255, 0.1);
-  box-shadow: inset 0 0 0 1px rgba(94, 242, 255, 0.24);
+  color: var(--accent);
+  background: rgb(from var(--accent) r g b / 0.1);
+  box-shadow: inset 0 0 0 1px rgb(from var(--accent) r g b / 0.24);
 }
 
 /* Grab handle: everything between the tabs and the window buttons. */
@@ -234,12 +234,12 @@
 }
 
 .win-btn:hover {
-  background: rgba(150, 170, 230, 0.1);
+  background: rgb(from var(--hairline-ink) r g b / 0.1);
   color: var(--fg);
 }
 
 .win-btn.danger:hover {
-  background: rgba(255, 94, 122, 0.85);
+  background: rgb(from var(--danger) r g b / 0.85);
   color: #fff;
 }
 
@@ -273,7 +273,7 @@
 /* Pane count, shown only once a tab is actually split. */
 #st-panes {
   padding-left: 7px;
-  color: var(--neon-cyan);
+  color: var(--accent);
   opacity: 0.7;
 }
 
@@ -282,15 +282,15 @@
 }
 
 #status .sep {
-  color: rgba(150, 170, 230, 0.22);
+  color: rgb(from var(--hairline-ink) r g b / 0.22);
 }
 
 #status .pulse {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--neon-mint);
-  box-shadow: 0 0 8px var(--neon-mint);
+  background: var(--accent-ok);
+  box-shadow: 0 0 8px var(--accent-ok);
   animation: pulse 2.6s ease-in-out infinite;
 }
 

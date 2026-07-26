@@ -1,5 +1,6 @@
 import "@xterm/xterm/css/xterm.css";
 import "./styles/base.css";
+import "./styles/themes.css";
 import "./styles/chrome.css";
 import "./styles/term.css";
 import "./styles/effects.css";
@@ -19,7 +20,7 @@ import type { Session } from "./session";
 import { dismissBoot } from "./ui/boot";
 import { revealWindow, wireWindowChrome } from "./ui/chrome";
 import { CursorGlow } from "./ui/cursor-glow";
-import { SettingsPanel } from "./ui/settings";
+import { HOTKEY_WARNING, SettingsPanel } from "./ui/settings";
 import { TabBar } from "./ui/tabbar";
 import { Workspace } from "./workspace";
 
@@ -70,8 +71,8 @@ const workspace = new Workspace(panes, {
     applyImmersive();
     paintStatus();
   },
-  onTabDead: (tab) => {
-    tabs.setDead(tab.key);
+  onTabDead: (tab, dead) => {
+    tabs.setDead(tab.key, dead);
     paintStatus();
   },
   onTabClose: (tab) => {
@@ -203,13 +204,15 @@ async function restoreGeometry(shape: unknown): Promise<void> {
 async function copySelection(): Promise<void> {
   const text = workspace.focused?.term.getSelection() ?? "";
   if (text.length === 0) return;
-  await navigator.clipboard.writeText(text);
+  // WebView2 can refuse clipboard access; a copy that silently didn't happen
+  // beats an unhandled rejection.
+  await navigator.clipboard.writeText(text).catch(() => undefined);
 }
 
 async function pasteClipboard(): Promise<void> {
   const session = workspace.focused;
   if (session === null || !session.alive) return;
-  const text = await navigator.clipboard.readText();
+  const text = await navigator.clipboard.readText().catch(() => "");
   // Route through xterm so bracketed-paste mode is honoured when the shell
   // has asked for it.
   if (text.length > 0) session.term.paste(text);
@@ -268,6 +271,8 @@ function matchShortcut(event: KeyboardEvent): (() => void) | null {
         return () => workspace.activateRelative(-1);
       case "PageUp":
         return () => workspace.activateRelative(-1);
+      case "PageDown":
+        return () => workspace.activateRelative(1);
     }
     return null;
   }
@@ -286,7 +291,13 @@ function matchShortcut(event: KeyboardEvent): (() => void) | null {
     return null;
   }
 
-  if (event.altKey && !event.shiftKey) {
+  // AltGr on Windows reports as Ctrl+Alt; on many layouts AltGr+digit types a
+  // character, and swallowing it here would make those keys dead.
+  if (
+    event.altKey &&
+    !event.shiftKey &&
+    !event.getModifierState("AltGraph")
+  ) {
     const digit = /^Digit([1-9])$/.exec(event.code);
     if (digit !== null) {
       const index = Number(digit[1]) - 1;
@@ -319,6 +330,26 @@ function handleTerminalKey(event: KeyboardEvent): boolean {
 // Same bindings when focus is on the chrome rather than inside a terminal.
 window.addEventListener("keydown", (event) => {
   if (workspace.focused?.term.textarea === document.activeElement) return;
+  // Keys typed into the settings panel are data entry, not commands — without
+  // this, typing in the font field could tear tabs open. The two ways of
+  // closing the panel keep working: Escape, and the same Ctrl+, that opened it.
+  if (
+    event.target instanceof Element &&
+    event.target.closest("#settings") !== null
+  ) {
+    if (event.code === "Escape" && settings.isOpen) {
+      settings.hide();
+    } else if (
+      event.ctrlKey &&
+      !event.shiftKey &&
+      !event.altKey &&
+      event.code === "Comma"
+    ) {
+      event.preventDefault();
+      settings.toggle();
+    }
+    return;
+  }
   if (event.code === "Escape" && settings.isOpen) {
     settings.hide();
     return;
@@ -361,7 +392,10 @@ async function main(): Promise<void> {
   // owns the geometry for as long as it is armed.
   if (settingsValues.quakeEnabled) {
     const ok = await quakeApply();
-    if (!ok) console.warn("quake hotkey could not be registered");
+    // Surfaced in the panel footer — there is no console in a release build.
+    // The backend refuses to hide-on-blur while the hotkey is unbound, so the
+    // window stays reachable either way.
+    if (!ok) settings.warn(HOTKEY_WARNING);
     await quakeDrop();
   } else if (saved !== null) {
     await restoreGeometry(saved).catch(() => undefined);
@@ -370,17 +404,27 @@ async function main(): Promise<void> {
   // Reveal behind the boot curtain so the first frame is never a white flash.
   revealWindow();
 
-  const restored =
-    saved !== null && (await workspace.restore(saved).catch(() => false));
-  if (!restored) await workspace.open();
-
-  void watchGeometry();
-  await dismissBoot();
-  workspace.focused?.focus();
+  try {
+    const restored =
+      saved !== null && (await workspace.restore(saved).catch(() => false));
+    if (!restored) await workspace.open();
+  } finally {
+    // Whatever happened above, the curtain must lift — a failed shell launch
+    // shows its error in the pane, not a forever-boot screen.
+    void watchGeometry();
+    await dismissBoot();
+    workspace.focused?.focus();
+  }
 }
 
 // The webview gets torn down before Rust sees the exit, so this is the last
 // chance to write the workspace out.
 window.addEventListener("beforeunload", () => void saveSnapshot());
 
-void main();
+main().catch((error: unknown) => {
+  // Should be unreachable — every step above has its own fallback — but a blank
+  // window that never reveals would be strictly worse than a broken one.
+  console.error(error);
+  revealWindow();
+  void dismissBoot();
+});

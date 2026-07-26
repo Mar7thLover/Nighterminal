@@ -15,8 +15,9 @@ pnpm tauri build    # 打包到 src-tauri/target/release
 ## 功能
 
 - 多标签页，任意嵌套分屏（`Ctrl+Shift+D` 右分 / `Ctrl+Shift+E` 下分，`Alt+方向键` 移焦点）
+- 五套暗色主题（暗夜 / 樱花 / 抹茶 / 琥珀 / 霓虹玫瑰），终端调色板与界面辉光整套切换
 - 设置面板（`Ctrl+,`），改动即时生效并写入 `config.json`
-- 恢复上次会话：标签页、分屏布局、各 pane 的工作目录、窗口几何
+- 恢复上次会话：标签页、分屏布局、各 pane 的 shell 与工作目录、窗口几何
 - Quake 下拉：全局热键从屏幕顶部落下，可设高度与失焦隐藏
 - 半透明毛玻璃背景、光标辉光、全屏 TUI 自动让出状态栏
 
@@ -33,7 +34,7 @@ pnpm tauri build    # 打包到 src-tauri/target/release
 | `Ctrl+Shift+W` | 关闭当前 pane（最后一个则关闭标签页） |
 | `Alt+方向键` | 切换焦点到相邻 pane |
 | `Ctrl+Tab` / `Ctrl+Shift+Tab` | 下一个 / 上一个标签页 |
-| `Ctrl+PageDown` / `Ctrl+PageUp` | 同上 |
+| `Ctrl+(Shift+)PageDown` / `Ctrl+(Shift+)PageUp` | 同上 |
 | `Ctrl+Alt+1`…`9` | 跳到第 N 个标签页 |
 | `Ctrl+Shift+C` | 复制选区 |
 | `Ctrl+V` / `Ctrl+Shift+V` | 粘贴 |
@@ -49,7 +50,7 @@ pnpm tauri build    # 打包到 src-tauri/target/release
 
 ```
 src/                    前端
-  theme/nightfall.ts    从 CSS 变量读出 xterm 配色（配色的唯一来源在 styles/base.css）
+  theme/nightfall.ts    从 CSS 变量读出 xterm 配色（配色的唯一来源在 styles/）
   config.ts             配置的类型、加载与应用（默认值和边界在 Rust 侧）
   session.ts            Session：终端实例、PTY 连线、cwd 追踪
   layout.ts             分屏二叉树：切分 / 坍缩 / 拖拽分隔条 / 几何寻邻 / 序列化
@@ -61,6 +62,7 @@ src/                    前端
   ui/chrome.ts          无边框窗口按钮
   ui/boot.ts            启动扫描线动画
   styles/base.css       设计令牌 + 背景层
+  styles/themes.css     配色主题（每个主题只覆盖与默认不同的令牌）
 src-tauri/
   src/pty.rs            ConPTY 会话、UTF-8 边界安全解码、8ms 批量输出
   src/config.rs         config.json：默认值、范围收敛、读写
@@ -71,7 +73,10 @@ src-tauri/
 
 ## 改配色
 
-只改 `src/styles/base.css` 里 `:root` 的自定义属性即可，`theme/nightfall.ts` 会把它们读出来喂给 xterm.js。
+设置面板里可以直接切主题。想调整或新增主题：默认配色在 `src/styles/base.css` 的 `:root` 里，各主题在
+`src/styles/themes.css` 里只覆盖与默认不同的令牌；再往 `src/ui/settings.ts` 的主题下拉里加一行选项即可。
+`theme/nightfall.ts` 会把当前生效的 CSS 变量读出来喂给 xterm.js，不需要在 TS 里写任何颜色。
+注意事项（为什么全是暗色系、哪些令牌必须是纯色值）见 [CLAUDE.md](CLAUDE.md)。
 
 ## 配置文件
 

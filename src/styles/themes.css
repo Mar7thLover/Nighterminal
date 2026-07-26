@@ -1,0 +1,163 @@
+/* ---------------------------------------------------------------------------
+ * Colour themes.
+ *
+ * `applyChrome` stamps the config's theme id onto `<html data-theme=…>`; each
+ * block below overrides only what differs from the nightfall defaults in
+ * base.css — the cascade supplies the rest. An unknown id matches nothing and
+ * falls back to nightfall wholesale, which is why the id is not whitelisted
+ * anywhere.
+ *
+ * Every theme here is a *dark* variant on purpose: `src/ansi/flatten-bg.ts`
+ * only rewrites near-black TUI fills, so a light surface would need a whole
+ * different flattening rule before it could work (see CLAUDE.md §4).
+ *
+ * The --term-* / --ansi-* values are read back by theme/nightfall.ts and
+ * parsed by xterm itself: plain colours only, no var() and no rgb(from …).
+ * ------------------------------------------------------------------------- */
+
+/* 樱花 — warm plum glass, pink signature. */
+:root[data-theme="sakura"] {
+  --bg-void: #0b0609;
+  --bg-deep: #120a10;
+  --tint-term-rgb: 18 10 16;
+  --tint-bar: rgba(36, 20, 32, 0.46);
+  --tint-bar-fade: rgba(20, 11, 18, 0.24);
+  --tint-status: rgba(14, 8, 13, 0.4);
+  --sheet-hi: rgba(42, 24, 38, 0.9);
+  --sheet-lo: rgba(22, 12, 20, 0.92);
+  --well-ink: #0e070c;
+  --boot-hi: #1a0d17;
+
+  --hairline-ink: #e0a0c4;
+
+  --fg: #f0dce8;
+  --fg-dim: #a98a9e;
+  --fg-mute: #715b67;
+
+  --accent: #ff8fc7;
+  --accent-2: #c48bff;
+  --accent-3: #ff8f9e;
+  --accent-ok: #8fe8b0;
+
+  --term-fg: #f0dce8;
+  --term-cursor: #ff8fc7;
+  --term-selection: rgba(255, 143, 199, 0.24);
+  --term-selection-dim: rgba(255, 143, 199, 0.12);
+  --ansi-red: #ff6b88;
+  --ansi-green: #7deb9f;
+  --ansi-yellow: #ffd08f;
+  --ansi-blue: #8fa8ff;
+  --ansi-magenta: #ff8fc7;
+  --ansi-cyan: #8fd8ef;
+  --ansi-white: #ecd8e4;
+  --ansi-bright-magenta: #ffb3d9;
+  --ansi-bright-cyan: #b3e8f7;
+}
+
+/* 抹茶 — green tea over dark moss. */
+:root[data-theme="matcha"] {
+  --bg-void: #060b08;
+  --bg-deep: #0a120d;
+  --tint-term-rgb: 9 17 12;
+  --tint-bar: rgba(20, 36, 26, 0.46);
+  --tint-bar-fade: rgba(11, 20, 14, 0.24);
+  --tint-status: rgba(8, 15, 10, 0.4);
+  --sheet-hi: rgba(24, 42, 30, 0.9);
+  --sheet-lo: rgba(12, 22, 15, 0.92);
+  --well-ink: #060e09;
+  --boot-hi: #0d1a11;
+
+  --hairline-ink: #9ed4ae;
+
+  --fg: #dcf0e2;
+  --fg-dim: #8aa992;
+  --fg-mute: #5b7263;
+
+  --accent: #8fe6a0;
+  --accent-2: #d8e68f;
+  --accent-3: #5ecfc0;
+  --accent-ok: #8fe6a0;
+
+  --term-fg: #dcf0e2;
+  --term-cursor: #8fe6a0;
+  --term-selection: rgba(143, 230, 160, 0.24);
+  --term-selection-dim: rgba(143, 230, 160, 0.12);
+  --ansi-green: #8fe6a0;
+  --ansi-yellow: #e6d88f;
+  --ansi-blue: #7fa8d8;
+  --ansi-magenta: #b89fd8;
+  --ansi-cyan: #7fdec8;
+  --ansi-white: #d4e6d8;
+  --ansi-bright-green: #b3f0be;
+  --ansi-bright-cyan: #a8ecdc;
+}
+
+/* 琥珀 — ember light held in dark resin. */
+:root[data-theme="amber"] {
+  --bg-void: #0c0806;
+  --bg-deep: #120d08;
+  --tint-term-rgb: 18 13 8;
+  --tint-bar: rgba(38, 28, 18, 0.46);
+  --tint-bar-fade: rgba(22, 15, 10, 0.24);
+  --tint-status: rgba(16, 11, 7, 0.4);
+  --sheet-hi: rgba(44, 32, 20, 0.9);
+  --sheet-lo: rgba(24, 16, 10, 0.92);
+  --well-ink: #0e0a06;
+  --boot-hi: #1a1309;
+
+  --hairline-ink: #e6c896;
+
+  --fg: #f0e8d8;
+  --fg-dim: #a99a82;
+  --fg-mute: #71624e;
+
+  --accent: #ffc25e;
+  --accent-2: #ff8f5e;
+  --accent-3: #ffe08c;
+  --accent-ok: #b8e65e;
+
+  --term-fg: #f0e8d8;
+  --term-cursor: #ffc25e;
+  --term-selection: rgba(255, 194, 94, 0.24);
+  --term-selection-dim: rgba(255, 194, 94, 0.12);
+  --ansi-red: #ff7a5e;
+  --ansi-green: #b8e65e;
+  --ansi-yellow: #ffc25e;
+  --ansi-blue: #9db3e6;
+  --ansi-magenta: #d89fb3;
+  --ansi-cyan: #a8d8c8;
+  --ansi-white: #e8ddc8;
+  --ansi-bright-yellow: #ffd88c;
+}
+
+/* 霓虹玫瑰 — hot pink first, the old cyan demoted to a partner. */
+:root[data-theme="neon-rose"] {
+  --bg-void: #0c060a;
+  --bg-deep: #120a10;
+  --tint-term-rgb: 18 9 15;
+  --tint-bar: rgba(38, 18, 34, 0.46);
+  --tint-bar-fade: rgba(20, 10, 18, 0.24);
+  --tint-status: rgba(15, 8, 14, 0.4);
+  --sheet-hi: rgba(44, 22, 40, 0.9);
+  --sheet-lo: rgba(24, 12, 22, 0.92);
+  --well-ink: #0e060c;
+  --boot-hi: #1c0d18;
+
+  --hairline-ink: #e696c8;
+
+  --fg: #f0d8e8;
+  --fg-dim: #a9829b;
+  --fg-mute: #714e64;
+
+  --accent: #ff5ec4;
+  --accent-2: #5ef2ff;
+  --accent-3: #a06bff;
+
+  --term-fg: #f0d8e8;
+  --term-cursor: #ff5ec4;
+  --term-selection: rgba(255, 94, 196, 0.24);
+  --term-selection-dim: rgba(255, 94, 196, 0.12);
+  --ansi-magenta: #ff5ec4;
+  --ansi-bright-magenta: #ff8fd9;
+  --ansi-white: #e8d4e0;
+}

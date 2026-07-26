@@ -8,7 +8,8 @@
 //! re-binding means posting it a message rather than touching Win32 from
 //! wherever the settings panel happened to call from.
 
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::sync::mpsc::Sender;
 use std::sync::Mutex;
 
 use tauri::{AppHandle, Manager, PhysicalPosition, PhysicalSize, WebviewWindow};
@@ -24,6 +25,20 @@ pub struct Quake {
     thread: AtomicU32,
     /// What the hotkey thread should register on its next wake-up.
     desired: Mutex<Option<Binding>>,
+    /// One-shot reply for the `arm()` call currently waiting on a rebind;
+    /// `RegisterHotKey` runs on the hotkey thread, so its outcome has to travel
+    /// back over a channel.
+    reply: Mutex<Option<Sender<bool>>>,
+    /// Whether a hotkey is registered *right now*. Gates hide-on-blur: with no
+    /// taskbar entry and no tray, hiding a window whose hotkey never bound
+    /// would leave no way to bring it back.
+    active: AtomicBool,
+}
+
+impl Quake {
+    pub fn hotkey_active(&self) -> bool {
+        self.active.load(Ordering::Acquire)
+    }
 }
 
 // --------------------------------------------------------------- accelerator
@@ -225,8 +240,13 @@ pub fn start(app: &AppHandle) {
                 .thread
                 .store(unsafe { win::GetCurrentThreadId() }, Ordering::Release);
             // The desired binding may already have been set before this thread
-            // came up; register it before entering the loop.
+            // came up; register it before entering the loop. An `arm()` racing
+            // this startup may already be waiting on the reply slot.
             let mut registered = rebind(&state, false);
+            state.active.store(registered, Ordering::Release);
+            if let Some(tx) = state.reply.lock().unwrap().take() {
+                let _ = tx.send(registered);
+            }
 
             let mut msg = win::Msg {
                 hwnd: null_mut(),
@@ -249,7 +269,13 @@ pub fn start(app: &AppHandle) {
                         let _ = handle.run_on_main_thread(move || toggle(&app));
                     }
                     win::WM_REBIND => {
-                        registered = rebind(&handle.state::<Quake>(), registered);
+                        let state = handle.state::<Quake>();
+                        registered = rebind(&state, registered);
+                        state.active.store(registered, Ordering::Release);
+                        let reply = state.reply.lock().unwrap().take();
+                        if let Some(tx) = reply {
+                            let _ = tx.send(registered);
+                        }
                     }
                     _ => {}
                 }
@@ -278,8 +304,11 @@ fn rebind(state: &tauri::State<'_, Quake>, registered: bool) -> bool {
     unsafe { win::RegisterHotKey(null_mut(), win::HOTKEY_ID, mods, vk) != 0 }
 }
 
-/// Point the hotkey thread at a new binding (or at none) and wake it.
-pub fn arm(app: &AppHandle, config: &Config) {
+/// Point the hotkey thread at a new binding (or at none), wake it, and wait
+/// briefly for the outcome. Returns true when the config is fully in effect:
+/// quake off, or the hotkey genuinely registered — a combination another app
+/// already owns comes back false instead of pretending the binding took.
+pub fn arm(app: &AppHandle, config: &Config) -> bool {
     let binding = if config.quake_enabled {
         parse(&config.quake_hotkey)
     } else {
@@ -290,11 +319,19 @@ pub fn arm(app: &AppHandle, config: &Config) {
 
     #[cfg(windows)]
     {
+        let (tx, rx) = std::sync::mpsc::channel();
+        *state.reply.lock().unwrap() = Some(tx);
         let thread = state.thread.load(Ordering::Acquire);
         if thread != 0 {
             unsafe { win::PostThreadMessageW(thread, win::WM_REBIND, 0, 0) };
+            if let Ok(registered) = rx.recv_timeout(std::time::Duration::from_millis(500)) {
+                return !config.quake_enabled || registered;
+            }
         }
+        // The thread is not up yet (early startup): it will pick `desired` up
+        // on its own way in and answer through the reply slot it finds armed.
     }
+    !config.quake_enabled || binding.is_some()
 }
 
 #[cfg(not(windows))]

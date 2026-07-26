@@ -285,11 +285,19 @@ export function serializeLayout(node: LayoutNode): LayoutShape {
 export function isLayoutShape(value: unknown): value is LayoutShape {
   if (typeof value !== "object" || value === null) return false;
   const node = value as Record<string, unknown>;
-  if (node.kind === "leaf") return true;
+  if (node.kind === "leaf") {
+    // A leaf's fields go straight into `pty_spawn` arguments; anything that is
+    // not a string (or absent) must not get that far. Missing fields are fine —
+    // an older build's file simply falls back to the config at restore time.
+    const usable = (v: unknown): boolean =>
+      v === null || v === undefined || typeof v === "string";
+    return usable(node.shell) && usable(node.cwd);
+  }
   if (node.kind !== "split") return false;
   return (
     (node.dir === "row" || node.dir === "col") &&
     typeof node.ratio === "number" &&
+    Number.isFinite(node.ratio) &&
     isLayoutShape(node.a) &&
     isLayoutShape(node.b)
   );

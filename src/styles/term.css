@@ -74,10 +74,10 @@
 .splitter:hover,
 .splitter.dragging {
   background: linear-gradient(
-    var(--neon-cyan),
-    var(--neon-violet)
+    var(--accent),
+    var(--accent-2)
   );
-  box-shadow: 0 0 12px -2px rgba(94, 242, 255, 0.7);
+  box-shadow: 0 0 12px -2px rgb(from var(--accent) r g b / 0.7);
 }
 
 /* The pointer is captured by the divider during a drag, so the cursor has to be
@@ -100,7 +100,7 @@ html.resizing-y * {
   inset: 0;
   z-index: 14;
   pointer-events: none;
-  box-shadow: inset 0 0 0 1px rgba(94, 242, 255, 0.22);
+  box-shadow: inset 0 0 0 1px rgb(from var(--accent) r g b / 0.22);
 }
 
 .split .pane:not(.focused) .xterm {
@@ -122,7 +122,7 @@ html.resizing-y * {
 .xterm .xterm-viewport {
   background: transparent !important;
   scrollbar-width: thin;
-  scrollbar-color: rgba(94, 242, 255, 0.3) transparent;
+  scrollbar-color: rgb(from var(--accent) r g b / 0.3) transparent;
 }
 
 .xterm .xterm-viewport::-webkit-scrollbar {
@@ -142,12 +142,12 @@ html.resizing-y * {
   border: 3px solid transparent;
   border-radius: 99px;
   background-clip: padding-box;
-  background-color: rgba(94, 242, 255, 0.28);
+  background-color: rgb(from var(--accent) r g b / 0.28);
   transition: background-color 0.2s ease;
 }
 
 .xterm .xterm-viewport::-webkit-scrollbar-thumb:hover {
-  background-color: rgba(94, 242, 255, 0.55);
+  background-color: rgb(from var(--accent) r g b / 0.55);
 }
 
 /* A shell that exited stays readable but visibly inert. */

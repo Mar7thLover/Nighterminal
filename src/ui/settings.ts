@@ -11,6 +11,10 @@
 import { config, updateConfig, type Config } from "../config";
 import { configPath, quakeApply, stateClear } from "../ipc";
 
+/** Shared with the startup path, which hits the same failure before the panel
+ *  has ever been opened. */
+export const HOTKEY_WARNING = "热键无法注册：组合键无效或已被其它程序占用";
+
 type Row =
   | { kind: "text"; label: string; hint?: string; get(c: Config): string; set(v: string): Partial<Config>; placeholder?: string }
   | { kind: "number"; label: string; hint?: string; min: number; max: number; step: number; get(c: Config): number; set(v: number): Partial<Config> }
@@ -28,6 +32,20 @@ const SECTIONS: Section[] = [
   {
     title: "外观",
     rows: [
+      {
+        kind: "select",
+        label: "主题",
+        hint: "配色整套切换，包括终端调色板与辉光",
+        options: [
+          ["nightfall", "暗夜"],
+          ["sakura", "樱花"],
+          ["matcha", "抹茶"],
+          ["amber", "琥珀"],
+          ["neon-rose", "霓虹玫瑰"],
+        ],
+        get: (c) => c.theme,
+        set: (v) => ({ theme: v }),
+      },
       {
         kind: "text",
         label: "字体",
@@ -206,6 +224,9 @@ export class SettingsPanel {
     this.root.querySelector(".close")?.addEventListener("click", () => this.hide());
 
     void configPath().then((path) => {
+      // Don't clobber a warning that landed before this round trip finished
+      // (startup hotkey registration failing is exactly that case).
+      if (this.root.classList.contains("warned")) return;
       this.note.textContent = path;
       this.note.title = path;
     });
@@ -238,16 +259,26 @@ export class SettingsPanel {
     await updateConfig(patch);
     if (QUAKE_KEYS.some((key) => key in patch)) {
       const ok = await quakeApply();
-      this.flag(ok ? null : "热键无法注册：组合键无效或已被其它程序占用");
+      this.warn(ok ? null : HOTKEY_WARNING);
     }
     if (patch.restoreSession === false) await stateClear();
     this.render();
   }
 
-  private flag(message: string | null): void {
+  /** Show a red warning in the footer, or clear it back to the config path.
+   *  Public: startup also lands here when its hotkey registration fails. */
+  warn(message: string | null): void {
     this.root.classList.toggle("warned", message !== null);
-    if (message !== null) this.note.textContent = message;
-    else void configPath().then((path) => (this.note.textContent = path));
+    if (message !== null) {
+      this.note.textContent = message;
+      return;
+    }
+    void configPath().then((path) => {
+      // A warning may have landed while this round trip was in flight; the
+      // path must not overwrite it (checked at resolve time, not call time).
+      if (this.root.classList.contains("warned")) return;
+      this.note.textContent = path;
+    });
   }
 
   private render(): void {
@@ -369,6 +400,13 @@ export class SettingsPanel {
         });
         input.addEventListener("keydown", (event) => {
           event.preventDefault();
+          // The combination being recorded must not double as a live shortcut —
+          // capturing Ctrl+Shift+T should not also open a tab.
+          event.stopPropagation();
+          if (event.key === "Escape" && describeAccelerator(event) === null) {
+            input.blur(); // bare Escape cancels the recording
+            return;
+          }
           const accelerator = describeAccelerator(event);
           if (accelerator === null) return;
           input.blur();

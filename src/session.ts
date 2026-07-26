@@ -7,7 +7,7 @@ import type { UnlistenFn } from "@tauri-apps/api/event";
 
 import { BackgroundFlattener } from "./ansi/flatten-bg";
 import { config, terminalOverrides, type Config } from "./config";
-import { RENDERER, nightfallOptions } from "./theme/nightfall";
+import { RENDERER, nightfallOptions, nightfallTheme } from "./theme/nightfall";
 import {
   onPtyData,
   onPtyExit,
@@ -16,6 +16,7 @@ import {
   ptyResize,
   ptySpawn,
   ptyWrite,
+  type SpawnResult,
 } from "./ipc";
 
 export type Renderer = "webgl" | "dom";
@@ -49,6 +50,14 @@ export class Session {
 
   ptyId: string | null = null;
   shell = "shell";
+  /**
+   * The shell this pane was *asked* to run — an explicit path from the config
+   * or a restored leaf, or null for "auto-probe". Snapshots record this rather
+   * than what the probe resolved: pinning a probed "pwsh.exe" would make every
+   * restored pane die if pwsh is later uninstalled, where a null re-probes and
+   * falls back gracefully.
+   */
+  private requestedShell: string | null = null;
   title = "shell";
   alive = true;
   /** The shell died within the launch grace period — probably never started. */
@@ -75,6 +84,8 @@ export class Session {
   private spawnedAt = 0;
   private mounted = false;
   private disposed = false;
+  /** Theme id baked into the current ITheme, to skip no-op retheming. */
+  private appliedTheme = config().theme;
 
   constructor(private readonly hooks: SessionHooks) {
     this.el = document.createElement("div");
@@ -190,10 +201,20 @@ export class Session {
 
   async start(restore?: SessionSnapshot): Promise<void> {
     this.fit();
-    const { id, shell } = await ptySpawn(this.term.cols, this.term.rows, {
-      shell: restore?.shell ?? undefined,
-      cwd: restore?.cwd ?? undefined,
-    });
+    this.requestedShell = restore?.shell ?? config().shell;
+    let spawned: SpawnResult;
+    try {
+      spawned = await ptySpawn(this.term.cols, this.term.rows, {
+        shell: restore?.shell ?? undefined,
+        cwd: restore?.cwd ?? undefined,
+      });
+    } catch (error) {
+      // The shell never started (bad path, most likely). The pane stays on
+      // screen wearing the error instead of the whole open() falling over.
+      this.failLaunch(error);
+      return;
+    }
+    const { id, shell } = spawned;
     if (this.disposed) {
       void ptyKill(id);
       return;
@@ -225,11 +246,24 @@ export class Session {
     this.launchFailed = performance.now() - this.spawnedAt < LAUNCH_GRACE_MS;
     this.el.classList.add("dead");
     if (this.launchFailed) {
+      // SGR 31 rather than a truecolor literal so the line follows the theme.
       this.term.write(
-        `\r\n\x1b[38;2;255;94;122m● ${this.shell} exited immediately — ` +
-          `see the console for the launch error.\x1b[0m\r\n`,
+        `\r\n\x1b[31m● ${this.shell} exited immediately — ` +
+          `whatever it printed above is the whole story.\x1b[0m\r\n`,
       );
     }
+    this.hooks.onExit(this);
+  }
+
+  /** `pty_spawn` itself failed. Same outcome as a shell that died instantly:
+   *  the pane stays, shows why in red, and the tab's dot goes red. */
+  private failLaunch(error: unknown): void {
+    if (this.disposed) return;
+    this.alive = false;
+    this.launchFailed = true;
+    this.el.classList.add("dead");
+    const detail = error instanceof Error ? error.message : String(error);
+    this.term.write(`\r\n\x1b[31m● ${detail}\x1b[0m\r\n`);
     this.hooks.onExit(this);
   }
 
@@ -239,6 +273,13 @@ export class Session {
     const options = terminalOverrides(settings);
     for (const [key, value] of Object.entries(options)) {
       (this.term.options as Record<string, unknown>)[key] = value;
+    }
+    // Rebuild the ITheme only on an actual theme switch — it forces a full
+    // repaint, which a font-size nudge shouldn't pay for. `applyChrome` has
+    // already stamped the new `data-theme`, so the CSS variables read fresh.
+    if (settings.theme !== this.appliedTheme) {
+      this.appliedTheme = settings.theme;
+      this.term.options.theme = nightfallTheme();
     }
     this.fit();
   }
@@ -260,7 +301,10 @@ export class Session {
   }
 
   snapshot(): SessionSnapshot {
-    return { shell: config().shell, cwd: this.cwd };
+    // What this pane was asked to run — the configured default may have
+    // changed since, and restoring should bring back what was open. "Auto"
+    // stays null so the restore re-probes instead of pinning a probe result.
+    return { shell: this.requestedShell, cwd: this.cwd };
   }
 
   dispose(): void {

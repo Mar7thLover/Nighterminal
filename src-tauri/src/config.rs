@@ -39,6 +39,9 @@ fn default_quake_hotkey() -> String {
 fn default_quake_height() -> f32 {
     0.45
 }
+fn default_theme() -> String {
+    "nightfall".into()
+}
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(default, rename_all = "camelCase")]
@@ -59,6 +62,12 @@ pub struct Config {
     pub cwd: Option<String>,
 
     // ---- appearance
+    /// Colour theme id, matched against `:root[data-theme=…]` rules in CSS.
+    /// Unknown ids are harmless — nothing matches and the default cascade
+    /// applies — so this is not whitelisted here; adding a theme touches only
+    /// the CSS and the settings panel's option list.
+    #[serde(default = "default_theme")]
+    pub theme: String,
     /// Alpha of the smoked-glass tint over the OS backdrop, 0…1.
     #[serde(default = "default_opacity")]
     pub opacity: f32,
@@ -93,6 +102,7 @@ impl Default for Config {
             cursor_blink: false,
             shell: None,
             cwd: None,
+            theme: default_theme(),
             opacity: default_opacity(),
             aurora: true,
             cursor_glow: true,
@@ -123,6 +133,15 @@ impl Config {
         if self.font_family.trim().is_empty() {
             self.font_family = default_font_family();
         }
+        self.theme = self.theme.trim().to_string();
+        if self.theme.is_empty() {
+            self.theme = default_theme();
+        }
+        // quake_hotkey is deliberately NOT validated here: sanitize also runs
+        // on save, and silently swapping an unparseable recorded combination
+        // for the default would kill the settings panel's "组合键无效" warning
+        // (quake_apply reports the failure honestly, and hide-on-blur is gated
+        // on a live registration, so an unusable string is visible and safe).
     }
 }
 

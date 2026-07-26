@@ -5,6 +5,7 @@ import type { Config } from "./config";
 
 export interface SpawnResult {
   id: string;
+  /** Friendly shell name for the status bar ("pwsh", "powershell", "cmd"). */
   shell: string;
 }
 

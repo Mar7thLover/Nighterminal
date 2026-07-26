@@ -73,8 +73,8 @@ export class TabBar {
     if (text !== null && text !== undefined) text.textContent = label;
   }
 
-  setDead(key: string): void {
-    this.tabs.get(key)?.classList.add("dead");
+  setDead(key: string, dead: boolean): void {
+    this.tabs.get(key)?.classList.toggle("dead", dead);
   }
 
   select(key: string | null): void {

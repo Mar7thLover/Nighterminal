@@ -42,13 +42,25 @@ TUI 假设终端不透明，会给高亮片段刷一层自己的背景色。Clau
 
 Session 里存的是 `ChildKiller` 而不是 `Child`，因为 `Child` 本体被移进了 waiter 线程。
 
+flusher 的退出判定藏在 `attached` 门后面，所以前端从未 attach 就 kill 掉的会话（`start()` 里 `disposed` 早退那条路）要靠 `Pump::closed`（`Session` 的 `Drop` 置位）打断循环，否则留下一条每 8ms 空转到进程退出的线程。
+
 ## 6. `pty_attach` 握手不能省
 
 shell 打印提示符可能快过前端 `listen()` 注册完成。Rust 侧先把输出缓冲住，等前端调用 `pty_attach` 再放行，否则首屏输出会丢。
 
 ## 7. 配色的唯一来源是 CSS
 
-`src/styles/base.css` 的 `:root` 自定义属性是唯一来源，`theme/nightfall.ts` 用 `getComputedStyle` 读回去构造 xterm 的 `ITheme`。别在 TS 里另写一份颜色常量。
+`src/styles/base.css` 的 `:root` 自定义属性是默认主题，`src/styles/themes.css` 按 `:root[data-theme=…]` 覆盖差异令牌；`theme/nightfall.ts` 用 `getComputedStyle` 读回去构造 xterm 的 `ITheme`。别在 TS 里另写一份颜色常量。
+
+主题相关的三条硬约束：
+
+- **`--term-*` / `--ansi-*` 必须是纯色字面量**（hex 或 rgba）。这些值被 `nightfallTheme()` 读出来交给 xterm 自己解析，xterm 不认 `var()` 间接引用，也不认 `rgb(from …)` 相对色语法 —— 写了不会报错，只会静默变成默认色。界面 CSS 里的派生透明度（`rgb(from var(--accent) r g b / .3)`）不受此限。
+- **不要加浅色主题**。`ansi/flatten-bg.ts` 的判据（见第 4 节）建立在"终端底色是暗的"之上：浅底下 TUI 刷的黑色填充会被改写成浅色而前景仍按黑底选色，TUI 刷的浅色填充又不满足暗色阈值直接漏过。浅色主题需要先重写 flatten 判据，是独立工程。
+- **主题 id 故意不做白名单**（Rust 侧只 trim + 空值回退）。未知 id 匹配不到任何 CSS 规则，级联自动退回默认主题，坏不了；加一个主题只需要改 `themes.css` 和 `settings.ts` 的下拉两处。
+
+另外主题切换的生效顺序是固定的：`onConfigChange` 里 `applyChrome`（写 `data-theme`）在 `workspace.applySettings()`（`getComputedStyle` 读新值）之前，`getComputedStyle` 会强制同步样式重算，所以读到的一定是新主题。调换这个顺序会读到旧值。
+
+配置里的 `opacity`（玻璃浓度）只以 `--tint-alpha` 内联写入，tint 的**颜色**在 `--tint-term-rgb` 里归主题管 —— 若把整个 `--tint-term` 写成内联样式，会以内联优先级盖掉所有主题。
 
 ## 8. 分屏：`.split` 必须自己带 `flex: 1 1 0`
 
@@ -72,6 +84,8 @@ flex item 的 `flex-basis` 默认 `auto`，于是整棵树会缩到文字宽度 
 
 `WM_HOTKEY` 里**不能**直接操作窗口，要 `run_on_main_thread`。
 
+`RegisterHotKey` 的成败只有热键线程自己知道，所以 `arm()` 通过 `Quake::reply` 里的一次性 channel 等它回话（带 500ms 超时兜底），`quake_apply` 才能把"组合键已被占用"如实报给设置面板 —— 别改回"parse 成功就算成功"。注册结果同时存进 `Quake::active`：失焦自动隐藏**只在热键真的注册上了**才执行，否则一个不在任务栏、又没有热键能唤回的隐藏窗口就永久失踪了。`quake_apply` 是 async command，因为同步 command 跑在主线程上，等 channel 会把 UI 卡住。
+
 开启 quake 会给窗口加 `always_on_top` + `skip_taskbar`。调试时注意：这两个 flag 是**运行期设在窗口上的**，config 改回 false 后必须再调一次 `quake_apply` 才会摘掉，否则一个永远置顶的窗口会一直压在桌面上。
 
 ## 11. 窗口几何不要在最小化/最大化时记录
@@ -83,6 +97,7 @@ flex item 的 `flex-basis` 默认 `auto`，于是整棵树会缩到文字宽度 
 窗口是无边框 + 半透明的，截图有两个坑：
 
 - **别用"截屏幕对应区域"**。Windows 不允许后台进程抢前台，会拍到当时屏幕上的无关内容。用 `PrintWindow` + `PW_RENDERFULLCONTENT`(2) 只抓应用自身像素。
+- **截图进程必须先 `SetProcessDPIAware()`**。否则在 150% 缩放下 `GetWindowRect` 返回的是虚拟化(缩小)坐标，而 `PrintWindow` 按物理像素渲染 —— 位图开小了，右侧和底部被静默裁掉。症状极具迷惑性：状态栏"消失"，但 DOM 探针显示它就在原位。
 - `PrintWindow` **抓不到 DWM 合成的毛玻璃层**，所以截图里背景总是比实际偏暗偏平。判断毛玻璃是否生效看状态栏右下角（`acrylic` / `mica` / `solid`），别靠肉眼看截图。
 
 想在不抢焦点的前提下触发操作：临时在 `main.ts` 里挂一段带 `setTimeout` 的探针，直接调 `workspace.split()` / `settings.show()` 这些方法，验证完删掉。`SendKeys` 需要窗口在前台，后台进程做不到。

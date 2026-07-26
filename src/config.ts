@@ -16,6 +16,7 @@ export interface Config {
   shell: string | null;
   cwd: string | null;
 
+  theme: string;
   opacity: number;
   aurora: boolean;
   cursorGlow: boolean;
@@ -41,6 +42,7 @@ const FALLBACK: Config = {
   cursorBlink: false,
   shell: null,
   cwd: null,
+  theme: "nightfall",
   opacity: 0.5,
   aurora: true,
   cursorGlow: true,
@@ -85,13 +87,15 @@ export function onConfigChange(listener: (config: Config) => void): () => void {
 /**
  * The parts of the config that belong to the page rather than to a Terminal.
  *
- * Colour still lives entirely in `styles/base.css`; what the config overrides
- * here is the *tint alpha* over the OS backdrop, which is a preference rather
- * than part of the palette.
+ * Colour still lives entirely in CSS: the theme id becomes `data-theme`, which
+ * `styles/themes.css` matches, and the only property written inline is the
+ * *tint alpha* — a preference, not part of any palette. Writing the whole tint
+ * colour inline would out-specificity every theme.
  */
 export function applyChrome(config: Config): void {
   const root = document.documentElement;
-  root.style.setProperty("--tint-term", `rgba(9, 10, 18, ${config.opacity})`);
+  root.dataset.theme = config.theme;
+  root.style.setProperty("--tint-alpha", String(config.opacity));
   root.classList.toggle("no-aurora", !config.aurora);
   root.classList.toggle("no-glow", !config.cursorGlow);
   root.style.setProperty("--font-mono", config.fontFamily);

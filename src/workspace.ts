@@ -41,7 +41,9 @@ export interface WorkspaceHooks {
   onTabOpen(tab: Tab): void;
   onTabTitle(tab: Tab): void;
   onTabActivate(tab: Tab | null): void;
-  onTabDead(tab: Tab): void;
+  /** A pane in this tab failed to launch (dead=true), or the last failed pane
+   *  was closed and the tab is healthy again (dead=false). */
+  onTabDead(tab: Tab, dead: boolean): void;
   onTabClose(tab: Tab): void;
   /** Focused pane changed, or its geometry did. */
   onFocus(session: Session | null): void;
@@ -264,6 +266,11 @@ export class Workspace {
     if (tab.focused === session) this.focus(survivors[0]);
     this.refit(tab);
     this.hooks.onTabTitle(tab);
+    // Closing the failed pane may have been the point — clear the red dot once
+    // no dead-on-arrival pane is left in this tab.
+    if (session.launchFailed) {
+      this.hooks.onTabDead(tab, survivors.some((s) => s.launchFailed));
+    }
   }
 
   focus(session: Session): void {
@@ -308,7 +315,7 @@ export class Workspace {
         if (session.launchFailed) {
           // Marked whichever tab it happened in — a background tab going red is
           // exactly how you find out something failed to start.
-          this.hooks.onTabDead(tab);
+          this.hooks.onTabDead(tab, true);
           return;
         }
         this.closePane(tab, session);

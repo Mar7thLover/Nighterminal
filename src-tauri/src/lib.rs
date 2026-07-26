@@ -24,16 +24,17 @@ fn chrome_info(chrome: State<'_, Chrome>) -> ChromeInfo {
 }
 
 /// Re-arm the global hotkey and the always-on-top/taskbar flags after the
-/// settings panel writes a new config. Reports whether the accelerator could
-/// actually be parsed, so the panel can flag an unusable binding.
+/// settings panel writes a new config. Reports whether the hotkey actually
+/// registered — not just whether it parsed — so the panel can flag a
+/// combination some other program already owns. Async so the wait for the
+/// hotkey thread's answer never blocks the main thread.
 #[tauri::command]
-fn quake_apply(app: tauri::AppHandle) -> bool {
+async fn quake_apply(app: tauri::AppHandle) -> bool {
     let settings = config::load(&app);
     if let Some(main) = app.get_webview_window("main") {
         quake::apply_window_flags(&main, &settings);
     }
-    quake::arm(&app, &settings);
-    !settings.quake_enabled || quake::parse(&settings.quake_hotkey).is_some()
+    quake::arm(&app, &settings)
 }
 
 /// Drop the window into position without toggling it — used at startup when
@@ -76,15 +77,23 @@ pub fn run() {
                 quake::apply_window_flags(&main, &settings);
             }
             quake::start(app.handle());
-            quake::arm(app.handle(), &settings);
+            let _ = quake::arm(app.handle(), &settings);
             Ok(())
         })
         .on_window_event(|window, event| {
             // A drop-down console gets out of the way the moment focus leaves.
             if let WindowEvent::Focused(false) = event {
-                let settings = config::load(window.app_handle());
-                if settings.quake_enabled && settings.quake_hide_on_blur {
-                    let _ = window.hide();
+                let app = window.app_handle();
+                // Only hide while the hotkey is genuinely registered: with no
+                // taskbar entry and no tray, a hidden window whose hotkey never
+                // bound would be unrecoverable. Checked first because it is a
+                // plain atomic read, sparing a config-file parse on every blur
+                // while quake is off.
+                if app.state::<quake::Quake>().hotkey_active() {
+                    let settings = config::load(app);
+                    if settings.quake_enabled && settings.quake_hide_on_blur {
+                        let _ = window.hide();
+                    }
                 }
             }
         })

@@ -6,31 +6,48 @@
  * retheming the app means editing only this file.
  * ------------------------------------------------------------------------- */
 :root {
-  /* surfaces — everything is translucent so the OS acrylic reads through */
+  /* surfaces — everything is translucent so the OS acrylic reads through.
+     The terminal tint is split in two: the colour belongs to the theme, the
+     alpha is the user's 玻璃浓度 slider (written inline by applyChrome). */
   --bg-void: #06070c;
   --bg-deep: #0a0b12;
-  --tint-term: rgba(9, 10, 18, 0.5);
+  --tint-term-rgb: 9 10 18;
+  --tint-alpha: 0.5;
+  --tint-term: rgb(var(--tint-term-rgb) / var(--tint-alpha));
   --tint-bar: rgba(20, 22, 38, 0.46);
   --tint-bar-fade: rgba(11, 12, 22, 0.24);
   --tint-status: rgba(8, 9, 16, 0.4);
+  --sheet-hi: rgba(24, 26, 44, 0.9);
+  --sheet-lo: rgba(12, 13, 24, 0.92);
+  --well-ink: #06070e;
+  --boot-hi: #0d0f1c;
 
-  /* hairlines */
-  --line: rgba(150, 170, 230, 0.1);
-  --line-strong: rgba(150, 170, 230, 0.19);
+  /* hairlines — every rule derives from one ink, so a theme retints them all
+     by overriding --hairline-ink alone */
+  --hairline-ink: #96aae6;
+  --line: rgb(from var(--hairline-ink) r g b / 0.1);
+  --line-strong: rgb(from var(--hairline-ink) r g b / 0.19);
 
   /* ink */
   --fg: #d8def0;
   --fg-dim: #838da9;
   --fg-mute: #565e77;
 
-  /* neon accents */
-  --neon-cyan: #5ef2ff;
-  --neon-violet: #a06bff;
-  --neon-pink: #ff5ec4;
-  --neon-mint: #5ef2a8;
+  /* accents — semantic slots, not hues: --accent carries the identity of the
+     theme, --accent-2/-3 are gradient partners, --accent-ok is "alive".
+     Derived alphas are written as rgb(from var(--accent) r g b / a) at the
+     point of use, so overriding these four retints every glow and hover. */
+  --accent: #5ef2ff;
+  --accent-2: #a06bff;
+  --accent-3: #ff5ec4;
+  --accent-ok: #5ef2a8;
   --danger: #ff5e7a;
 
-  /* terminal palette — cool-toned so colourful output never turns garish */
+  /* terminal palette — cool-toned so colourful output never turns garish.
+     Everything from here to --term-selection-dim is read back by
+     theme/nightfall.ts and parsed by xterm itself, so these must stay plain
+     colours: no var() indirection survives into ITheme, and xterm does not
+     understand rgb(from …) relative syntax. */
   --ansi-black: #12141f;
   --ansi-red: #ff5e7a;
   --ansi-green: #5ef2a8;
@@ -52,6 +69,7 @@
   --term-cursor: #5ef2ff;
   --term-cursor-ink: #05060b;
   --term-selection: rgba(94, 242, 255, 0.24);
+  --term-selection-dim: rgba(94, 242, 255, 0.12);
 
   --radius-win: 10px;
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
@@ -92,7 +110,7 @@ button {
 }
 
 ::selection {
-  background: rgba(94, 242, 255, 0.28);
+  background: rgb(from var(--accent) r g b / 0.28);
 }
 
 #app {
@@ -152,23 +170,23 @@ html.no-backdrop #app {
   background:
     radial-gradient(
       38% 30% at 22% 26%,
-      rgba(160, 107, 255, 0.34),
-      rgba(160, 107, 255, 0) 70%
+      rgb(from var(--accent-2) r g b / 0.34),
+      rgb(from var(--accent-2) r g b / 0) 70%
     ),
     radial-gradient(
       34% 28% at 78% 68%,
-      rgba(94, 242, 255, 0.26),
-      rgba(94, 242, 255, 0) 70%
+      rgb(from var(--accent) r g b / 0.26),
+      rgb(from var(--accent) r g b / 0) 70%
     ),
     radial-gradient(
       30% 34% at 62% 12%,
-      rgba(255, 94, 196, 0.16),
-      rgba(255, 94, 196, 0) 72%
+      rgb(from var(--accent-3) r g b / 0.16),
+      rgb(from var(--accent-3) r g b / 0) 72%
     ),
     radial-gradient(
       46% 40% at 40% 92%,
-      rgba(94, 242, 168, 0.12),
-      rgba(94, 242, 168, 0) 74%
+      rgb(from var(--accent-ok) r g b / 0.12),
+      rgb(from var(--accent-ok) r g b / 0) 74%
     );
   animation: drift 54s linear infinite;
   will-change: transform;
@@ -200,8 +218,8 @@ html.no-backdrop #app {
   inset: 0;
   background: radial-gradient(
     120% 100% at 50% 38%,
-    rgba(6, 7, 12, 0) 32%,
-    rgba(6, 7, 12, 0.5) 100%
+    rgb(from var(--bg-void) r g b / 0) 32%,
+    rgb(from var(--bg-void) r g b / 0.5) 100%
   );
 }
 
