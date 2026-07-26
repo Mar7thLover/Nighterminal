@@ -1,0 +1,168 @@
+/* Cursor bloom and the boot sequence. */
+
+/* ------------------------------------------------------------ cursor bloom */
+
+/* Two stacked layers above the WebGL canvas. xterm still draws the crisp block
+   itself; these only add light. The halo's slower transition is what produces
+   the trail when the cursor jumps across a line. */
+.cursor-glow {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 15;
+  opacity: 0;
+  border-radius: 2px;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  transition: opacity 0.3s ease;
+  will-change: transform;
+}
+
+#glow-core {
+  background: var(--neon-cyan);
+  filter: blur(3px);
+  transition:
+    transform 0.07s linear,
+    opacity 0.2s ease;
+}
+
+#glow-halo {
+  background: radial-gradient(
+    closest-side,
+    rgba(94, 242, 255, 0.85),
+    rgba(94, 242, 255, 0) 100%
+  );
+  filter: blur(5px);
+  transition:
+    transform 0.23s cubic-bezier(0.16, 0.9, 0.28, 1),
+    opacity 0.3s ease;
+}
+
+/* Non-blinking block cursor + breathing bloom: one rhythm instead of two
+   fighting each other. `cursorBlink` is off in the Terminal options to match. */
+#glow-core.on {
+  animation: breathe-core 2.6s ease-in-out infinite;
+}
+
+#glow-halo.on {
+  animation: breathe-halo 2.6s ease-in-out infinite;
+}
+
+@keyframes breathe-core {
+  0%,
+  100% {
+    opacity: 0.34;
+  }
+  50% {
+    opacity: 0.68;
+  }
+}
+
+@keyframes breathe-halo {
+  0%,
+  100% {
+    opacity: 0.26;
+  }
+  50% {
+    opacity: 0.58;
+  }
+}
+
+/* Switched off in settings. Hidden rather than never-placed: CursorGlow keeps
+   tracking, so turning it back on needs no re-wiring. */
+html.no-glow .cursor-glow {
+  display: none;
+}
+
+/* ------------------------------------------------------------------- boot */
+
+#boot {
+  position: absolute;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: inherit;
+  background: radial-gradient(120% 90% at 50% 50%, #0d0f1c 0%, #06070c 100%);
+  transition: opacity 0.42s ease;
+}
+
+#boot.done {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.boot-word {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.52em;
+  /* Cancels the trailing letter-space so the word stays optically centred. */
+  text-indent: 0.52em;
+  color: var(--neon-cyan);
+  text-shadow:
+    0 0 12px rgba(94, 242, 255, 0.75),
+    0 0 34px rgba(94, 242, 255, 0.35);
+  animation: boot-word 900ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+@keyframes boot-word {
+  0% {
+    opacity: 0;
+    filter: blur(7px);
+    letter-spacing: 0.9em;
+  }
+  55% {
+    opacity: 1;
+    filter: blur(0);
+  }
+  100% {
+    opacity: 0.9;
+    filter: blur(0);
+    letter-spacing: 0.52em;
+  }
+}
+
+.boot-scan {
+  position: absolute;
+  left: -10%;
+  right: -10%;
+  top: 0;
+  height: 1.5px;
+  background: linear-gradient(
+    90deg,
+    rgba(94, 242, 255, 0),
+    rgba(94, 242, 255, 0.95) 50%,
+    rgba(94, 242, 255, 0)
+  );
+  box-shadow: 0 0 22px 5px rgba(94, 242, 255, 0.35);
+  animation: boot-scan 840ms cubic-bezier(0.45, 0.05, 0.35, 1) both;
+}
+
+@keyframes boot-scan {
+  0% {
+    top: -2%;
+    opacity: 0;
+  }
+  12% {
+    opacity: 1;
+  }
+  88% {
+    opacity: 1;
+  }
+  100% {
+    top: 102%;
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cursor-glow.on {
+    animation: none;
+    opacity: 0.45;
+  }
+  .boot-word,
+  .boot-scan {
+    animation-duration: 1ms;
+  }
+}

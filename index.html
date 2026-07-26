@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Nighterminal</title>
+  </head>
+  <body>
+    <div id="app">
+      <!-- Slow-drifting aurora + film grain, painted behind the acrylic tint. -->
+      <div id="backdrop" aria-hidden="true">
+        <div class="aurora"></div>
+        <div class="grain"></div>
+        <div class="vignette"></div>
+      </div>
+
+      <header id="chrome">
+        <div class="brand" title="Nighterminal">
+          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+            <path
+              d="M6 8.5 9.5 12 6 15.5M12.5 16h5.5"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+        </div>
+
+        <nav id="tabs" role="tablist" aria-label="终端会话">
+          <div id="tab-indicator" aria-hidden="true"></div>
+        </nav>
+
+        <button id="new-tab" class="icon-btn" title="新建标签页 (Ctrl+Shift+T)" aria-label="新建标签页">
+          <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+            <path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+          </svg>
+        </button>
+
+        <div class="drag-space" data-tauri-drag-region></div>
+
+        <button id="open-settings" class="icon-btn" title="设置 (Ctrl+,)" aria-label="设置">
+          <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+            <circle cx="12" cy="12" r="3.1" fill="none" stroke="currentColor" stroke-width="1.8" />
+            <path
+              d="M12 3.4v2.2M12 18.4v2.2M3.4 12h2.2M18.4 12h2.2M6 6l1.6 1.6M16.4 16.4 18 18M18 6l-1.6 1.6M7.6 16.4 6 18"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+            />
+          </svg>
+        </button>
+
+        <div id="win-controls">
+          <button class="win-btn" data-win="minimize" title="最小化" aria-label="最小化">
+            <svg viewBox="0 0 12 12" width="12" height="12" aria-hidden="true">
+              <path d="M2 6h8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" />
+            </svg>
+          </button>
+          <button class="win-btn" data-win="maximize" title="最大化" aria-label="最大化">
+            <svg viewBox="0 0 12 12" width="12" height="12" aria-hidden="true">
+              <rect x="2.6" y="2.6" width="6.8" height="6.8" rx="1.4" fill="none" stroke="currentColor" stroke-width="1.2" />
+            </svg>
+          </button>
+          <button class="win-btn danger" data-win="close" title="关闭" aria-label="关闭">
+            <svg viewBox="0 0 12 12" width="12" height="12" aria-hidden="true">
+              <path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" />
+            </svg>
+          </button>
+        </div>
+      </header>
+
+      <main id="stage">
+        <div id="panes"></div>
+        <!-- Cursor bloom lives above the WebGL canvas, never intercepting input. -->
+        <div id="glow-halo" class="cursor-glow" aria-hidden="true"></div>
+        <div id="glow-core" class="cursor-glow" aria-hidden="true"></div>
+      </main>
+
+      <footer id="status">
+        <span class="pulse" aria-hidden="true"></span>
+        <span id="st-shell">—</span>
+        <span class="sep">/</span>
+        <span id="st-size">—</span>
+        <span id="st-panes" class="off"></span>
+        <span class="spacer"></span>
+        <span id="st-renderer">—</span>
+        <span class="sep">/</span>
+        <span id="st-backdrop">—</span>
+      </footer>
+
+      <div id="boot" aria-hidden="true">
+        <div class="boot-word">NIGHTERMINAL</div>
+        <div class="boot-scan"></div>
+      </div>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

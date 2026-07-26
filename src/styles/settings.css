@@ -1,0 +1,286 @@
+/* Settings sheet. Slides in from the right over a dimming scrim; the sheet
+   itself is frosted so the terminal stays faintly visible behind it. */
+
+#settings {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  pointer-events: none;
+}
+
+#settings .scrim {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  background: rgba(4, 5, 10, 0.5);
+  transition: opacity 0.24s ease;
+}
+
+#settings .sheet {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(420px, 82vw);
+  display: flex;
+  flex-direction: column;
+  transform: translateX(102%);
+  transition: transform 0.32s var(--ease-out);
+  background: linear-gradient(
+    200deg,
+    rgba(24, 26, 44, 0.9),
+    rgba(12, 13, 24, 0.92)
+  );
+  backdrop-filter: blur(26px) saturate(1.3);
+  border-left: 1px solid var(--line-strong);
+  box-shadow: -24px 0 60px -30px rgba(0, 0, 0, 0.9);
+}
+
+#settings.on {
+  pointer-events: auto;
+}
+
+#settings.on .scrim {
+  opacity: 1;
+}
+
+#settings.on .sheet {
+  transform: none;
+}
+
+#settings header {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  height: 44px;
+  padding: 0 10px 0 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+#settings h2 {
+  flex: 1 1 auto;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--fg);
+}
+
+#settings .close {
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--fg-mute);
+  font-size: 12px;
+  transition:
+    background 0.16s ease,
+    color 0.16s ease;
+}
+
+#settings .close:hover {
+  background: rgba(255, 94, 122, 0.75);
+  color: #fff;
+}
+
+#settings .body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 6px 18px 18px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(94, 242, 255, 0.28) transparent;
+}
+
+#settings .group {
+  padding-top: 14px;
+}
+
+#settings h3 {
+  margin-bottom: 4px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--neon-cyan);
+  opacity: 0.75;
+}
+
+#settings .row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 0;
+  border-bottom: 1px solid rgba(150, 170, 230, 0.06);
+}
+
+#settings .row .text {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+#settings .name {
+  font-size: 12px;
+  color: var(--fg);
+}
+
+#settings .hint {
+  font-size: 10.5px;
+  line-height: 1.45;
+  color: var(--fg-mute);
+}
+
+/* ----------------------------------------------------------------- controls */
+
+#settings input[type="text"],
+#settings input[type="number"],
+#settings select {
+  flex: 0 0 auto;
+  width: 150px;
+  height: 27px;
+  padding: 0 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: 7px;
+  background: rgba(6, 7, 14, 0.55);
+  color: var(--fg);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  outline: none;
+  transition:
+    border-color 0.16s ease,
+    box-shadow 0.16s ease;
+}
+
+/* The font row needs the room; its value is long and worth reading. */
+#settings .row.text input[type="text"] {
+  width: 190px;
+}
+
+#settings input:focus,
+#settings select:focus {
+  border-color: rgba(94, 242, 255, 0.5);
+  box-shadow: 0 0 0 3px rgba(94, 242, 255, 0.1);
+}
+
+#settings input.hotkey {
+  width: 150px;
+  text-align: center;
+  cursor: pointer;
+}
+
+#settings .slider {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 150px;
+}
+
+#settings input[type="range"] {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 3px;
+  appearance: none;
+  border-radius: 2px;
+  background: linear-gradient(
+    90deg,
+    rgba(94, 242, 255, 0.55),
+    rgba(160, 107, 255, 0.55)
+  );
+  outline: none;
+}
+
+#settings input[type="range"]::-webkit-slider-thumb {
+  appearance: none;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: var(--fg);
+  box-shadow: 0 0 10px -2px var(--neon-cyan);
+  cursor: pointer;
+}
+
+#settings .readout {
+  flex: 0 0 auto;
+  width: 34px;
+  text-align: right;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--fg-dim);
+}
+
+#settings .switch {
+  flex: 0 0 auto;
+  position: relative;
+  width: 38px;
+  height: 21px;
+  border: 1px solid var(--line-strong);
+  border-radius: 99px;
+  background: rgba(6, 7, 14, 0.6);
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+#settings .switch::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: var(--fg-mute);
+  transition:
+    transform 0.22s var(--ease-out),
+    background 0.2s ease;
+}
+
+#settings .switch.on {
+  border-color: rgba(94, 242, 255, 0.45);
+  background: rgba(94, 242, 255, 0.16);
+  box-shadow: inset 0 0 12px -6px var(--neon-cyan);
+}
+
+#settings .switch.on::after {
+  transform: translateX(17px);
+  background: var(--neon-cyan);
+  box-shadow: 0 0 10px -1px var(--neon-cyan);
+}
+
+#settings footer {
+  flex: 0 0 auto;
+  padding: 8px 18px 10px;
+  border-top: 1px solid var(--line);
+}
+
+/* The config file path — selectable so it can be pasted into an editor. */
+#settings .note {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  direction: rtl;
+  text-align: left;
+  user-select: text;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--fg-mute);
+}
+
+#settings.warned .note {
+  direction: ltr;
+  color: var(--danger);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #settings .sheet,
+  #settings .scrim {
+    transition: none;
+  }
+}

@@ -1,0 +1,157 @@
+/* Terminal stage. The smoked-glass tint lives here as a DOM layer rather than
+   in xterm's own theme.background: the WebGL renderer then only ever draws
+   glyphs onto a fully transparent surface, which is its best-supported path. */
+
+#stage {
+  position: relative;
+  z-index: 10;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--tint-term);
+}
+
+#panes {
+  position: absolute;
+  inset: 0;
+}
+
+/* One layout tree per tab; only the active one is in flow. */
+.layout {
+  position: absolute;
+  inset: 0;
+  display: flex;
+}
+
+.layout.off {
+  display: none;
+}
+
+/* `flex: 1 1 0` matters on the outermost split too: as a flex *item* of
+   `.layout` its basis would otherwise be `auto`, and the whole tree would
+   shrink to the width of its text. */
+.split {
+  display: flex;
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+}
+
+.split.row {
+  flex-direction: row;
+}
+
+.split.col {
+  flex-direction: column;
+}
+
+.pane {
+  position: relative;
+  /* Without these a terminal that overflows would push its sibling out of the
+     container instead of scrolling — flex items default to min-size:auto. */
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* ---------------------------------------------------------------- splitters */
+
+.splitter {
+  flex: 0 0 5px;
+  position: relative;
+  z-index: 12;
+  background: var(--line);
+  transition: background 0.18s ease;
+}
+
+.split.row > .splitter {
+  cursor: col-resize;
+}
+
+.split.col > .splitter {
+  cursor: row-resize;
+}
+
+.splitter:hover,
+.splitter.dragging {
+  background: linear-gradient(
+    var(--neon-cyan),
+    var(--neon-violet)
+  );
+  box-shadow: 0 0 12px -2px rgba(94, 242, 255, 0.7);
+}
+
+/* The pointer is captured by the divider during a drag, so the cursor has to be
+   forced globally or it flickers back over the panes. */
+html.resizing-x,
+html.resizing-x * {
+  cursor: col-resize !important;
+}
+
+html.resizing-y,
+html.resizing-y * {
+  cursor: row-resize !important;
+}
+
+/* Which pane takes the keystrokes. Only worth marking once there is more than
+   one — a lone pane is unambiguous. */
+.split .pane.focused::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 14;
+  pointer-events: none;
+  box-shadow: inset 0 0 0 1px rgba(94, 242, 255, 0.22);
+}
+
+.split .pane:not(.focused) .xterm {
+  opacity: 0.82;
+  transition: opacity 0.2s ease;
+}
+
+/* Inset must live on `.xterm`, never on `.pane`. FitAddon sizes the grid from
+   the *parent's* height minus `.xterm`'s own padding — padding on the parent is
+   invisible to it, so the grid overflows and the last row gets clipped. */
+.xterm {
+  width: 100%;
+  height: 100%;
+  padding: 12px 6px 10px 14px;
+}
+
+/* xterm paints theme.background onto the viewport when transparency is off;
+   force it clear so our tint layer is what shows through. */
+.xterm .xterm-viewport {
+  background: transparent !important;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(94, 242, 255, 0.3) transparent;
+}
+
+.xterm .xterm-viewport::-webkit-scrollbar {
+  width: 10px;
+}
+
+/* Chromium draws stepper arrows by default; they look nothing like the rest. */
+.xterm .xterm-viewport::-webkit-scrollbar-button {
+  display: none;
+}
+
+.xterm .xterm-viewport::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.xterm .xterm-viewport::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: 99px;
+  background-clip: padding-box;
+  background-color: rgba(94, 242, 255, 0.28);
+  transition: background-color 0.2s ease;
+}
+
+.xterm .xterm-viewport::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(94, 242, 255, 0.55);
+}
+
+/* A shell that exited stays readable but visibly inert. */
+.pane.dead .xterm {
+  filter: saturate(0.45) brightness(0.78);
+  transition: filter 0.4s ease;
+}

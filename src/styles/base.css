@@ -1,0 +1,218 @@
+/* ---------------------------------------------------------------------------
+ * Nighterminal design tokens.
+ *
+ * This block is the single source of truth for colour. `theme/nightfall.ts`
+ * reads these custom properties back out to build the xterm.js ITheme, so
+ * retheming the app means editing only this file.
+ * ------------------------------------------------------------------------- */
+:root {
+  /* surfaces — everything is translucent so the OS acrylic reads through */
+  --bg-void: #06070c;
+  --bg-deep: #0a0b12;
+  --tint-term: rgba(9, 10, 18, 0.5);
+  --tint-bar: rgba(20, 22, 38, 0.46);
+  --tint-bar-fade: rgba(11, 12, 22, 0.24);
+  --tint-status: rgba(8, 9, 16, 0.4);
+
+  /* hairlines */
+  --line: rgba(150, 170, 230, 0.1);
+  --line-strong: rgba(150, 170, 230, 0.19);
+
+  /* ink */
+  --fg: #d8def0;
+  --fg-dim: #838da9;
+  --fg-mute: #565e77;
+
+  /* neon accents */
+  --neon-cyan: #5ef2ff;
+  --neon-violet: #a06bff;
+  --neon-pink: #ff5ec4;
+  --neon-mint: #5ef2a8;
+  --danger: #ff5e7a;
+
+  /* terminal palette — cool-toned so colourful output never turns garish */
+  --ansi-black: #12141f;
+  --ansi-red: #ff5e7a;
+  --ansi-green: #5ef2a8;
+  --ansi-yellow: #ffd25e;
+  --ansi-blue: #5ea8ff;
+  --ansi-magenta: #a06bff;
+  --ansi-cyan: #5ef2ff;
+  --ansi-white: #c8d0e8;
+  --ansi-bright-black: #3a4058;
+  --ansi-bright-red: #ff89a0;
+  --ansi-bright-green: #8cf7c4;
+  --ansi-bright-yellow: #ffe08c;
+  --ansi-bright-blue: #8cc4ff;
+  --ansi-bright-magenta: #c39bff;
+  --ansi-bright-cyan: #9bf8ff;
+  --ansi-bright-white: #f0f4ff;
+
+  --term-fg: #d8def0;
+  --term-cursor: #5ef2ff;
+  --term-cursor-ink: #05060b;
+  --term-selection: rgba(94, 242, 255, 0.24);
+
+  --radius-win: 10px;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+
+  --font-mono: "Cascadia Code", "Cascadia Mono", Consolas, "Microsoft YaHei",
+    monospace;
+  --font-ui: "Segoe UI Variable Text", "Segoe UI", system-ui,
+    "Microsoft YaHei UI", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+  /* Must stay transparent all the way down or the DWM backdrop is occluded. */
+  background: transparent;
+}
+
+body {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  color: var(--fg);
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+  cursor: default;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  cursor: default;
+}
+
+::selection {
+  background: rgba(94, 242, 255, 0.28);
+}
+
+#app {
+  position: relative;
+  height: 100vh;
+  display: grid;
+  /* Status row is `auto` so it can collapse to nothing in immersive mode. */
+  grid-template-rows: 40px minmax(0, 1fr) auto;
+  border-radius: var(--radius-win);
+  overflow: hidden;
+  /* Contain the cursor-bloom blend so it can't reach the page backdrop. */
+  isolation: isolate;
+}
+
+/* Glass rim, drawn above content so it survives the panes painting over it. */
+#app::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 60;
+  border: 1px solid var(--line-strong);
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+/* Squared off while maximised, matching what DWM does to the real frame. */
+html.maximized #app,
+html.maximized #app::after,
+html.maximized #boot {
+  border-radius: 0;
+}
+
+/* No native backdrop available (Windows 10 without acrylic, or non-Windows):
+   paint an opaque surface so the app never looks half-rendered. */
+html.no-backdrop #app {
+  background: var(--bg-deep);
+}
+
+/* ------------------------------------------------------------------ backdrop */
+
+#backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+/* Slowly drifting aurora. Only `transform` animates, so this composites once
+   and then costs nothing per frame. Fades use explicit zero-alpha stops —
+   `transparent` interpolates through black in gradients and muddies the edges. */
+.aurora {
+  position: absolute;
+  inset: -35%;
+  opacity: 0.9;
+  background:
+    radial-gradient(
+      38% 30% at 22% 26%,
+      rgba(160, 107, 255, 0.34),
+      rgba(160, 107, 255, 0) 70%
+    ),
+    radial-gradient(
+      34% 28% at 78% 68%,
+      rgba(94, 242, 255, 0.26),
+      rgba(94, 242, 255, 0) 70%
+    ),
+    radial-gradient(
+      30% 34% at 62% 12%,
+      rgba(255, 94, 196, 0.16),
+      rgba(255, 94, 196, 0) 72%
+    ),
+    radial-gradient(
+      46% 40% at 40% 92%,
+      rgba(94, 242, 168, 0.12),
+      rgba(94, 242, 168, 0) 74%
+    );
+  animation: drift 54s linear infinite;
+  will-change: transform;
+}
+
+@keyframes drift {
+  0% {
+    transform: rotate(0deg) scale(1.02);
+  }
+  50% {
+    transform: rotate(180deg) scale(1.12);
+  }
+  100% {
+    transform: rotate(360deg) scale(1.02);
+  }
+}
+
+.grain {
+  position: absolute;
+  inset: 0;
+  opacity: 0.05;
+  mix-blend-mode: overlay;
+  background-size: 180px 180px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+.vignette {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    120% 100% at 50% 38%,
+    rgba(6, 7, 12, 0) 32%,
+    rgba(6, 7, 12, 0.5) 100%
+  );
+}
+
+/* Aurora off in settings: the vignette and grain stay, so the surface still has
+   depth — it just stops moving and stops tinting. */
+html.no-aurora .aurora {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aurora {
+    animation: none;
+  }
+}

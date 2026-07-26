@@ -1,0 +1,330 @@
+/* Title bar, tab strip and status bar — the app's own window chrome. */
+
+#chrome {
+  position: relative;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 6px 0 9px;
+  min-width: 0;
+  background: linear-gradient(180deg, var(--tint-bar), var(--tint-bar-fade));
+  border-bottom: 1px solid var(--line);
+}
+
+.brand {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  color: var(--neon-cyan);
+  background: linear-gradient(
+    140deg,
+    rgba(94, 242, 255, 0.14),
+    rgba(160, 107, 255, 0.14)
+  );
+  box-shadow:
+    inset 0 0 0 1px rgba(94, 242, 255, 0.26),
+    0 0 16px -6px rgba(94, 242, 255, 0.8);
+}
+
+/* ---------------------------------------------------------------- tab strip */
+
+#tabs {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  flex: 0 1 auto;
+}
+
+/* A single travelling pill rather than a per-tab background: one element
+   sliding reads far smoother than N elements cross-fading. */
+#tab-indicator {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 0;
+  height: 28px;
+  border-radius: 9px;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate3d(0, -50%, 0);
+  background: linear-gradient(
+    135deg,
+    rgba(94, 242, 255, 0.17),
+    rgba(160, 107, 255, 0.17)
+  );
+  box-shadow:
+    inset 0 0 0 1px rgba(94, 242, 255, 0.3),
+    0 2px 18px -6px rgba(94, 242, 255, 0.75);
+  transition:
+    transform 0.34s var(--ease-out),
+    width 0.34s var(--ease-out),
+    opacity 0.22s ease;
+}
+
+.tab {
+  position: relative;
+  z-index: 1;
+  flex: 0 1 auto;
+  min-width: 92px;
+  max-width: 190px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 6px 0 11px;
+  border-radius: 9px;
+  font-size: 12px;
+  color: var(--fg-dim);
+  background: transparent;
+  transition:
+    color 0.2s ease,
+    background 0.2s ease;
+  animation: tab-in 0.26s var(--ease-out) both;
+}
+
+.tab:hover {
+  color: var(--fg);
+  background: rgba(150, 170, 230, 0.06);
+}
+
+.tab.active {
+  color: var(--fg);
+  background: transparent;
+}
+
+.tab .dot {
+  flex: 0 0 auto;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--fg-mute);
+  transition:
+    background 0.25s ease,
+    box-shadow 0.25s ease;
+}
+
+.tab.active .dot {
+  background: var(--neon-cyan);
+  box-shadow: 0 0 8px var(--neon-cyan);
+}
+
+.tab.dead .dot {
+  background: var(--danger);
+  box-shadow: 0 0 8px rgba(255, 94, 122, 0.7);
+}
+
+.tab .label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.tab .close {
+  flex: 0 0 auto;
+  width: 17px;
+  height: 17px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--fg-mute);
+  opacity: 0;
+  transition:
+    opacity 0.16s ease,
+    background 0.16s ease,
+    color 0.16s ease;
+}
+
+.tab:hover .close,
+.tab.active .close {
+  opacity: 1;
+}
+
+.tab .close:hover {
+  background: rgba(255, 94, 122, 0.2);
+  color: #fff;
+}
+
+@keyframes tab-in {
+  from {
+    opacity: 0;
+    transform: translateY(-5px) scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Lifted out of flow on the way out so surviving tabs reflow immediately and
+   the indicator lands in its final place without a second correction. */
+.tab.closing {
+  position: absolute;
+  top: 50%;
+  pointer-events: none;
+  margin-top: -14px;
+  animation: tab-out 0.17s ease forwards;
+}
+
+@keyframes tab-out {
+  to {
+    opacity: 0;
+    transform: scale(0.86);
+  }
+}
+
+/* ------------------------------------------------------------------ buttons */
+
+.icon-btn {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--fg-dim);
+  transition:
+    background 0.18s ease,
+    color 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.icon-btn:hover {
+  color: var(--neon-cyan);
+  background: rgba(94, 242, 255, 0.1);
+  box-shadow: inset 0 0 0 1px rgba(94, 242, 255, 0.24);
+}
+
+/* Grab handle: everything between the tabs and the window buttons. */
+.drag-space {
+  flex: 1 1 auto;
+  align-self: stretch;
+  min-width: 20px;
+}
+
+#win-controls {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 2px;
+}
+
+.win-btn {
+  width: 34px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--fg-dim);
+  transition:
+    background 0.16s ease,
+    color 0.16s ease;
+}
+
+.win-btn:hover {
+  background: rgba(150, 170, 230, 0.1);
+  color: var(--fg);
+}
+
+.win-btn.danger:hover {
+  background: rgba(255, 94, 122, 0.85);
+  color: #fff;
+}
+
+/* -------------------------------------------------------------- status line */
+
+#status {
+  position: relative;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 24px;
+  padding: 0 11px;
+  overflow: hidden;
+  white-space: nowrap;
+  transition:
+    height 0.22s ease,
+    opacity 0.16s ease;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  color: var(--fg-mute);
+  background: var(--tint-status);
+  border-top: 1px solid var(--line);
+}
+
+#status .spacer {
+  flex: 1 1 auto;
+}
+
+/* Pane count, shown only once a tab is actually split. */
+#st-panes {
+  padding-left: 7px;
+  color: var(--neon-cyan);
+  opacity: 0.7;
+}
+
+#st-panes.off {
+  display: none;
+}
+
+#status .sep {
+  color: rgba(150, 170, 230, 0.22);
+}
+
+#status .pulse {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--neon-mint);
+  box-shadow: 0 0 8px var(--neon-mint);
+  animation: pulse 2.6s ease-in-out infinite;
+}
+
+/* A full-screen TUI owns the grid — give it the whole window. The tab strip
+   stays: you still need a way out. */
+html.immersive #status {
+  height: 0;
+  opacity: 0;
+  border-top-color: transparent;
+}
+
+#status.detached .pulse {
+  background: var(--danger);
+  box-shadow: 0 0 8px var(--danger);
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 0.3;
+    transform: scale(0.82);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #status .pulse,
+  .tab {
+    animation: none;
+  }
+  #status {
+    transition: none;
+  }
+}
