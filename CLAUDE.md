@@ -44,6 +44,8 @@ Session 里存的是 `ChildKiller` 而不是 `Child`，因为 `Child` 本体被�
 
 flusher 的退出判定藏在 `attached` 门后面，所以前端从未 attach 就 kill 掉的会话（`start()` 里 `disposed` 早退那条路）要靠 `Pump::closed`（`Session` 的 `Drop` 置位）打断循环，否则留下一条每 8ms 空转到进程退出的线程。
 
+`pty:exit` 事件的 payload 是「退出码是否为 0」。waiter 先 `Release` 写 `exit_ok` 再清 `running`，flusher 观察到 `!running` 后读 `exit_ok` 因而不会读到旧值。前端用它区分 SSH pane 的"连接失败留红字"和"远端正常登出关 pane"——**别改回按耗时猜**：Windows 默认 TCP 连接超时约 21 秒，任何固定宽限期都会把慢失败连同错误信息一起吞掉。本地 shell pane 不用退出码（`exit 1` 是正常退出方式），仍按 1.5s 宽限期判"根本没起来"。
+
 ## 6. `pty_attach` 握手不能省
 
 shell 打印提示符可能快过前端 `listen()` 注册完成。Rust 侧先把输出缓冲住，等前端调用 `pty_attach` 再放行，否则首屏输出会丢。
@@ -91,6 +93,15 @@ flex item 的 `flex-basis` 默认 `auto`，于是整棵树会缩到文字宽度 
 ## 11. 窗口几何不要在最小化/最大化时记录
 
 最小化的窗口 `outerPosition()` 返回 `(-32000, -32000)`、尺寸是个占位值；最大化的返回整个屏幕。两者存进 `state.json` 下次都会把窗口恢复成废的。`main.ts` 的 `watchGeometry` 因此在这两种状态下直接跳过不记。
+
+## 12. 连字走 character joiner，不是 addon-ligatures
+
+`@xterm/addon-ligatures` 要用 Node 的字体探测，webview 里起不来。所以 `src/ligatures.ts` 维护一份常见连字序列表，经 `registerCharacterJoiner` 把匹配段交给渲染器合并成一个 run；DOM 渲染器把整段放进同一个 span，浏览器排版时字体自己的 calt 就生效了。两个推论：
+
+- 这依赖 DOM 渲染器按 run 排版，与第 1 条（不要换回 WebGL）绑定；
+- 字体没有连字时 join 是视觉无操作，所以开关不需要探测字体、也不需要按字体禁用。
+
+顺带：`pty_spawn` 现在接受 `args`，`-NoLogo` 只在**没有显式 args** 时追加 —— SSH pane 的命令行不是我们的，别去动它。ssh 的选项必须排在 destination **之前**传（`ui/connect.ts` 的 `parseSshTarget` 已保证），排在后面会被 OpenSSH 当成远程命令。
 
 ## 验证手法
 

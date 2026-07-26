@@ -13,6 +13,7 @@ export interface Config {
   scrollback: number;
   cursorStyle: "block" | "bar" | "underline";
   cursorBlink: boolean;
+  ligatures: boolean;
   shell: string | null;
   cwd: string | null;
 
@@ -40,6 +41,7 @@ const FALLBACK: Config = {
   scrollback: 10_000,
   cursorStyle: "block",
   cursorBlink: false,
+  ligatures: false,
   shell: null,
   cwd: null,
   theme: "nightfall",

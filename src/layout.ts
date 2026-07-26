@@ -103,6 +103,27 @@ function without(
   return undefined;
 }
 
+/**
+ * Exchange the positions of two panes. Only which leaf holds which session
+ * changes — the sessions keep their terminals, scrollback and pty untouched,
+ * and the next render moves their elements into place.
+ */
+export function swapLeaves(root: LayoutNode, a: Session, b: Session): boolean {
+  const la = leafOf(root, a);
+  const lb = leafOf(root, b);
+  if (la === null || lb === null || la === lb) return false;
+  la.session = b;
+  lb.session = a;
+  return true;
+}
+
+function leafOf(node: LayoutNode, session: Session): Leaf | null {
+  if (node.kind === "leaf") {
+    return node.session === session ? node : null;
+  }
+  return leafOf(node.a, session) ?? leafOf(node.b, session);
+}
+
 function replaceLeaf(
   node: LayoutNode,
   session: Session,
@@ -261,13 +282,22 @@ function centre(el: HTMLElement): { x: number; y: number } {
 
 /** Tree shape without the live sessions, for `state.json`. */
 export type LayoutShape =
-  | { kind: "leaf"; shell: string | null; cwd: string | null }
+  | { kind: "leaf"; shell: string | null; cwd: string | null; args?: string[] | null }
   | { kind: "split"; dir: Direction; ratio: number; a: LayoutShape; b: LayoutShape };
 
 export function serializeLayout(node: LayoutNode): LayoutShape {
   if (node.kind === "leaf") {
     const snapshot = node.session.snapshot();
-    return { kind: "leaf", shell: snapshot.shell, cwd: snapshot.cwd };
+    const shape: LayoutShape = {
+      kind: "leaf",
+      shell: snapshot.shell,
+      cwd: snapshot.cwd,
+    };
+    // Written only when present, so ordinary shell panes keep the old shape.
+    if (snapshot.args != null && snapshot.args.length > 0) {
+      shape.args = snapshot.args;
+    }
+    return shape;
   }
   return {
     kind: "split",
@@ -291,7 +321,12 @@ export function isLayoutShape(value: unknown): value is LayoutShape {
     // an older build's file simply falls back to the config at restore time.
     const usable = (v: unknown): boolean =>
       v === null || v === undefined || typeof v === "string";
-    return usable(node.shell) && usable(node.cwd);
+    const usableArgs =
+      node.args === null ||
+      node.args === undefined ||
+      (Array.isArray(node.args) &&
+        node.args.every((arg) => typeof arg === "string"));
+    return usable(node.shell) && usable(node.cwd) && usableArgs;
   }
   if (node.kind !== "split") return false;
   return (

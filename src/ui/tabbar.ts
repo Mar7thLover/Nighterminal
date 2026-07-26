@@ -7,9 +7,13 @@
 export interface TabBarHost {
   onSelect(key: string): void;
   onClose(key: string): void;
+  /** A drag finished; `keys` is the strip's new left-to-right order. */
+  onReorder(keys: string[]): void;
 }
 
 const CLOSE_ANIM_MS = 170;
+/** Below this a press is a click; past it, a reorder drag. */
+const DRAG_THRESHOLD_PX = 4;
 
 const CLOSE_ICON =
   '<svg viewBox="0 0 12 12" width="10" height="10" aria-hidden="true">' +
@@ -53,19 +57,112 @@ export class TabBar {
     this.root.appendChild(tab);
     this.tabs.set(key, tab);
 
-    tab.addEventListener("mousedown", (event) => {
+    // The entry animation must run exactly once. Drag-reordering re-inserts
+    // the element, and CSS restarts animations on re-insertion — freeze it
+    // off once it has played.
+    tab.addEventListener(
+      "animationend",
+      () => {
+        tab.style.animation = "none";
+      },
+      { once: true },
+    );
+
+    tab.addEventListener("pointerdown", (event) => {
       if (event.button === 1) {
         // Middle-click closes, as everywhere else with tabs.
         event.preventDefault();
         this.host.onClose(key);
-      } else if (event.button === 0 && event.target !== close) {
-        this.host.onSelect(key);
+        return;
       }
+      if (event.button !== 0 || close.contains(event.target as Node)) return;
+      this.host.onSelect(key);
+      this.beginDrag(tab, event);
     });
     close.addEventListener("click", (event) => {
       event.stopPropagation();
       this.host.onClose(key);
     });
+  }
+
+  /**
+   * Press-and-slide reorders the tab. The pressed tab is re-inserted among its
+   * siblings whenever the pointer crosses a midpoint; the `.tab` transitions
+   * make the others step aside. Under the threshold it stays a plain click.
+   */
+  private beginDrag(tab: HTMLDivElement, down: PointerEvent): void {
+    const startX = down.clientX;
+    let dragging = false;
+    let finished = false;
+
+    // Capture immediately, exactly like the pane splitter does: pointerup is
+    // then guaranteed to reach this element, so the listeners below always
+    // come off. Capturing only after the threshold would let a sub-threshold
+    // press released outside the tab leak them — and a leaked move handler
+    // turns plain hovering into phantom reordering.
+    try {
+      tab.setPointerCapture(down.pointerId);
+    } catch {
+      // Synthetic or stale pointer; the buttons check below still ends cleanly.
+    }
+
+    const others = (): HTMLElement[] =>
+      [...this.root.querySelectorAll<HTMLElement>(".tab:not(.closing)")].filter(
+        (el) => el !== tab,
+      );
+
+    const move = (event: PointerEvent): void => {
+      if ((event.buttons & 1) === 0) {
+        // The press ended somewhere we couldn't see (capture failed).
+        end();
+        return;
+      }
+      if (!dragging) {
+        if (Math.abs(event.clientX - startX) < DRAG_THRESHOLD_PX) return;
+        dragging = true;
+        tab.classList.add("dragging");
+      }
+      // First sibling whose midpoint lies right of the pointer is the one we
+      // slot in front of; none means the strip's end.
+      let ref: HTMLElement | null = null;
+      for (const el of others()) {
+        const box = el.getBoundingClientRect();
+        if (event.clientX < box.left + box.width / 2) {
+          ref = el;
+          break;
+        }
+      }
+      if (ref !== tab.nextElementSibling) {
+        this.root.insertBefore(tab, ref);
+        this.moveIndicator(false);
+      }
+    };
+
+    const end = (): void => {
+      // May fire twice (pointerup and lostpointercapture) — commit once.
+      if (finished) return;
+      finished = true;
+      tab.removeEventListener("pointermove", move);
+      tab.removeEventListener("pointerup", end);
+      tab.removeEventListener("pointercancel", end);
+      tab.removeEventListener("lostpointercapture", end);
+      if (!dragging) return;
+      tab.classList.remove("dragging");
+      this.moveIndicator(true);
+      this.host.onReorder(this.order());
+    };
+
+    tab.addEventListener("pointermove", move);
+    tab.addEventListener("pointerup", end);
+    tab.addEventListener("pointercancel", end);
+    tab.addEventListener("lostpointercapture", end);
+  }
+
+  /** Current left-to-right order of live tabs. */
+  private order(): string[] {
+    return [...this.root.querySelectorAll<HTMLElement>(".tab:not(.closing)")]
+      .map((el) => el.dataset.key ?? "")
+      .filter((key) => key.length > 0);
   }
 
   setLabel(key: string, label: string): void {

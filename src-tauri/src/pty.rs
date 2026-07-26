@@ -57,6 +57,12 @@ struct Pump {
     /// blocked long after the child has exited. The process handle is the only
     /// reliable signal on Windows.
     running: AtomicBool,
+    /// Whether the child exited cleanly (code 0). Written by the waiter
+    /// *before* it clears `running`, so whoever observes `running == false`
+    /// sees the right value. The frontend uses it to tell "ssh failed, keep
+    /// the error on screen" from "remote logout, close the pane" — wall-clock
+    /// heuristics can't make that call (a TCP timeout takes ~21s on Windows).
+    exit_ok: AtomicBool,
     /// Output pools here until the frontend has registered its listener. A
     /// shell can print its prompt before the `listen()` round-trip completes,
     /// and those first bytes would otherwise be dropped on the floor.
@@ -138,13 +144,18 @@ fn friendly_name(program: &str) -> String {
         .unwrap_or_else(|| program.to_string())
 }
 
-fn build_command(program: &str, cwd: Option<String>) -> CommandBuilder {
+fn build_command(program: &str, args: &[String], cwd: Option<String>) -> CommandBuilder {
     let mut cmd = CommandBuilder::new(program);
 
-    // Skip the copyright banner so the first thing you see is a prompt.
+    // Skip the copyright banner so the first thing you see is a prompt — but
+    // only when the caller didn't bring its own command line (an SSH pane's
+    // args are not ours to prepend to).
     let stem = friendly_name(program).to_lowercase();
-    if stem == "pwsh" || stem == "powershell" {
+    if args.is_empty() && (stem == "pwsh" || stem == "powershell") {
         cmd.arg("-NoLogo");
+    }
+    for arg in args {
+        cmd.arg(arg);
     }
 
     // A restored directory that has since been deleted must not take the whole
@@ -174,6 +185,7 @@ pub fn pty_spawn(
     app: AppHandle,
     state: State<'_, PtyState>,
     shell: Option<String>,
+    args: Option<Vec<String>>,
     cwd: Option<String>,
     cols: u16,
     rows: u16,
@@ -183,6 +195,7 @@ pub fn pty_spawn(
         .or_else(|| crate::config::load(&app).shell)
         .filter(|s| !s.trim().is_empty())
         .unwrap_or_else(default_shell);
+    let args = args.unwrap_or_default();
     let cwd = cwd.or_else(|| crate::config::load(&app).cwd);
 
     let pair = native_pty_system()
@@ -196,7 +209,7 @@ pub fn pty_spawn(
 
     let mut child = pair
         .slave
-        .spawn_command(build_command(&program, cwd))
+        .spawn_command(build_command(&program, &args, cwd))
         .map_err(|e| format!("failed to launch {program}: {e}"))?;
     drop(pair.slave);
     let killer = child.clone_killer();
@@ -216,6 +229,7 @@ pub fn pty_spawn(
         running: AtomicBool::new(true),
         attached: AtomicBool::new(false),
         closed: AtomicBool::new(false),
+        exit_ok: AtomicBool::new(false),
     });
 
     // Waiter: the authoritative "shell is gone" signal.
@@ -224,7 +238,8 @@ pub fn pty_spawn(
         std::thread::Builder::new()
             .name(format!("pty-wait-{id}"))
             .spawn(move || {
-                let _ = child.wait();
+                let ok = child.wait().map(|status| status.success()).unwrap_or(false);
+                pump.exit_ok.store(ok, Ordering::Release);
                 pump.running.store(false, Ordering::Release);
             })
             .map_err(|e| format!("waiter thread failed: {e}"))?;
@@ -289,8 +304,9 @@ pub fn pty_spawn(
                         }
                     }
                     // Buffer drained *and* the process is gone: shell exited.
+                    // The payload says whether it exited cleanly.
                     None if !pump.running.load(Ordering::Acquire) => {
-                        let _ = app.emit(&exit_event, ());
+                        let _ = app.emit(&exit_event, pump.exit_ok.load(Ordering::Acquire));
                         break;
                     }
                     None => {}

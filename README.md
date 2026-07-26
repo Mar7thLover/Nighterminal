@@ -14,10 +14,13 @@ pnpm tauri build    # 打包到 src-tauri/target/release
 
 ## 功能
 
-- 多标签页，任意嵌套分屏（`Ctrl+Shift+D` 右分 / `Ctrl+Shift+E` 下分，`Alt+方向键` 移焦点）
+- 多标签页（可拖拽重排），任意嵌套分屏（`Ctrl+Shift+D` 右分 / `Ctrl+Shift+E` 下分，
+  `Alt+方向键` 移焦点，`Ctrl+Alt+方向键` 与相邻 pane 换位）
+- SSH 快速连接（`Ctrl+Shift+S`，走系统 OpenSSH——密钥、known_hosts 行为与命令行一致）
 - 五套暗色主题（暗夜 / 樱花 / 抹茶 / 琥珀 / 霓虹玫瑰），终端调色板与界面辉光整套切换
+- 可选的编程连字（`=>` `!=` 等，需字体本身支持）
 - 设置面板（`Ctrl+,`），改动即时生效并写入 `config.json`
-- 恢复上次会话：标签页、分屏布局、各 pane 的 shell 与工作目录、窗口几何
+- 恢复上次会话：标签页顺序、分屏布局、各 pane 的 shell 与工作目录（含 SSH 目标）、窗口几何
 - Quake 下拉：全局热键从屏幕顶部落下，可设高度与失焦隐藏
 - 半透明毛玻璃背景、光标辉光、全屏 TUI 自动让出状态栏
 
@@ -29,10 +32,12 @@ pnpm tauri build    # 打包到 src-tauri/target/release
 | 组合 | 作用 |
 | --- | --- |
 | `Ctrl+Shift+T` | 新建标签页 |
+| `Ctrl+Shift+S` | SSH 快速连接 |
 | `Ctrl+Shift+D` | 向右分屏 |
 | `Ctrl+Shift+E` | 向下分屏 |
 | `Ctrl+Shift+W` | 关闭当前 pane（最后一个则关闭标签页） |
 | `Alt+方向键` | 切换焦点到相邻 pane |
+| `Ctrl+Alt+方向键` | 当前 pane 与相邻 pane 换位 |
 | `Ctrl+Tab` / `Ctrl+Shift+Tab` | 下一个 / 上一个标签页 |
 | `Ctrl+(Shift+)PageDown` / `Ctrl+(Shift+)PageUp` | 同上 |
 | `Ctrl+Alt+1`…`9` | 跳到第 N 个标签页 |
@@ -53,11 +58,13 @@ src/                    前端
   theme/nightfall.ts    从 CSS 变量读出 xterm 配色（配色的唯一来源在 styles/）
   config.ts             配置的类型、加载与应用（默认值和边界在 Rust 侧）
   session.ts            Session：终端实例、PTY 连线、cwd 追踪
-  layout.ts             分屏二叉树：切分 / 坍缩 / 拖拽分隔条 / 几何寻邻 / 序列化
+  ligatures.ts          编程连字：常见序列表 + character joiner 回调
+  layout.ts             分屏二叉树：切分 / 坍缩 / 换位 / 拖拽分隔条 / 几何寻邻 / 序列化
   workspace.ts          标签页与其中的 pane：生命周期、焦点、快照
   ipc.ts                Rust 命令与事件封装
   ui/settings.ts        设置面板（改动即写盘、即生效）
-  ui/tabbar.ts          标签栏（滑动霓虹指示条）
+  ui/connect.ts         SSH 快速连接框（组装 argv 交给系统 ssh.exe）
+  ui/tabbar.ts          标签栏（滑动霓虹指示条、拖拽重排）
   ui/cursor-glow.ts     光标辉光与拖尾覆盖层
   ui/chrome.ts          无边框窗口按钮
   ui/boot.ts            启动扫描线动画
@@ -83,7 +90,10 @@ src-tauri/
 `%APPDATA%\dev.nighterminal.app\config.json`（设置）与 `state.json`（会话快照）。默认值和取值
 范围由 `src-tauri/src/config.rs` 定义，两个文件都可以手改。
 
-## 尚未实现
+## 实现方式的取舍
 
-SSH、标签页拖拽重排、pane 换位、字体连字（需要 `@xterm/addon-ligatures`，它依赖 Node 的字体探测，
-浏览器环境下不可用）。
+- **SSH** 走系统自带的 OpenSSH 客户端（`ssh.exe`），不内置协议栈 —— 密钥、agent、known_hosts、
+  `~/.ssh/config` 的行为与命令行完全一致，应用自身不带任何加密代码。
+- **连字**不解析字体文件（`@xterm/addon-ligatures` 依赖 Node 的字体探测，webview 里用不了）：
+  内置一份常见编程连字序列表，经 xterm 的 character joiner 把匹配段交给浏览器整段排版，字体自己的
+  calt 规则就生效了。个别字体特有的花式连字（如 Fira Code 的 `www`）不在其列。

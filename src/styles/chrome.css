@@ -165,6 +165,15 @@
   }
 }
 
+/* Mid-drag: the pressed tab must follow re-insertion instantly — transitions
+   on it would fight the live reordering. */
+.tab.dragging {
+  z-index: 5;
+  opacity: 0.85;
+  transition: none;
+  animation: none;
+}
+
 /* Lifted out of flow on the way out so surviving tabs reflow immediately and
    the indicator lands in its final place without a second correction. */
 .tab.closing {

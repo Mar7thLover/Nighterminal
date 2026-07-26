@@ -56,6 +56,8 @@ pub struct Config {
     #[serde(default = "default_cursor_style")]
     pub cursor_style: String,
     pub cursor_blink: bool,
+    /// Render programming ligatures (=> != …) when the font has them.
+    pub ligatures: bool,
     /// `None` means "probe for pwsh, then powershell, then cmd".
     pub shell: Option<String>,
     /// Where new sessions start. `None` means the user's home directory.
@@ -100,6 +102,7 @@ impl Default for Config {
             scrollback: default_scrollback(),
             cursor_style: default_cursor_style(),
             cursor_blink: false,
+            ligatures: false,
             shell: None,
             cwd: None,
             theme: default_theme(),

@@ -274,9 +274,116 @@
   color: var(--danger);
 }
 
+/* ------------------------------------------------------------- SSH connect */
+
+/* Small centred prompt, same glass language as the settings sheet. */
+#connect {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+
+#connect .scrim {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  background: rgba(4, 5, 10, 0.5);
+  transition: opacity 0.2s ease;
+}
+
+#connect .box {
+  position: relative;
+  width: min(440px, 86vw);
+  padding: 16px 18px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--line-strong);
+  background: linear-gradient(200deg, var(--sheet-hi), var(--sheet-lo));
+  backdrop-filter: blur(26px) saturate(1.3);
+  box-shadow: 0 24px 60px -30px rgba(0, 0, 0, 0.9);
+  opacity: 0;
+  transform: translateY(-8px) scale(0.98);
+  transition:
+    opacity 0.2s ease,
+    transform 0.24s var(--ease-out);
+}
+
+#connect.on {
+  pointer-events: auto;
+}
+
+#connect.on .scrim {
+  opacity: 1;
+}
+
+#connect.on .box {
+  opacity: 1;
+  transform: none;
+}
+
+#connect h2 {
+  margin-bottom: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  color: var(--accent);
+}
+
+#connect input {
+  width: 100%;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: rgb(from var(--well-ink) r g b / 0.55);
+  color: var(--fg);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  outline: none;
+  transition:
+    border-color 0.16s ease,
+    box-shadow 0.16s ease;
+}
+
+#connect input:focus {
+  border-color: rgb(from var(--accent) r g b / 0.5);
+  box-shadow: 0 0 0 3px rgb(from var(--accent) r g b / 0.1);
+}
+
+#connect .hint {
+  margin-top: 8px;
+  font-size: 10.5px;
+  line-height: 1.5;
+  color: var(--fg-mute);
+}
+
+/* Enter on unusable input: a visible refusal instead of silence. */
+#connect input.reject {
+  border-color: rgb(from var(--danger) r g b / 0.65);
+  box-shadow: 0 0 0 3px rgb(from var(--danger) r g b / 0.12);
+  animation: connect-reject 0.26s ease;
+}
+
+@keyframes connect-reject {
+  0%,
+  100% {
+    transform: none;
+  }
+  25% {
+    transform: translateX(-4px);
+  }
+  60% {
+    transform: translateX(3px);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   #settings .sheet,
-  #settings .scrim {
+  #settings .scrim,
+  #connect .box,
+  #connect .scrim {
     transition: none;
   }
 }

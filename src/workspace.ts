@@ -18,6 +18,7 @@ import {
   serializeLayout,
   sessionsOf,
   splitAt,
+  swapLeaves,
   type Direction,
   type LayoutNode,
   type LayoutShape,
@@ -162,6 +163,7 @@ export class Workspace {
         const from = restore?.kind === "leaf" ? restore : undefined;
         await session.start({
           shell: from?.shell ?? shell,
+          args: from?.args ?? null,
           cwd: from?.cwd ?? config().cwd,
         });
       }),
@@ -195,6 +197,24 @@ export class Workspace {
   activateIndex(index: number): void {
     const tab = this.tabs[index];
     if (tab !== undefined) this.activate(tab);
+  }
+
+  /** Match the strip's order after a drag, so Ctrl+Tab cycling, Ctrl+Alt+N and
+   *  the snapshot all agree with what the eye sees. */
+  reorderTabs(keys: string[]): void {
+    const byKey = new Map(this.tabs.map((tab) => [tab.key, tab]));
+    const next: Tab[] = [];
+    for (const key of keys) {
+      const tab = byKey.get(key);
+      if (tab !== undefined) {
+        next.push(tab);
+        byKey.delete(key);
+      }
+    }
+    // Anything the strip didn't mention (mid-close animation) keeps its place.
+    next.push(...byKey.values());
+    this.tabs.length = 0;
+    this.tabs.push(...next);
   }
 
   closeTab(tab: Tab): void {
@@ -293,6 +313,22 @@ export class Workspace {
     if (tab === null) return;
     const next = neighbour(tab.root, tab.focused, side);
     if (next !== null) this.focus(next);
+  }
+
+  /** Swap the focused pane with its nearest neighbour in a direction. Focus
+   *  travels with the pane, so repeated presses keep walking it along. */
+  swapSide(side: Side): void {
+    const tab = this.activeTab;
+    if (tab === null) return;
+    const other = neighbour(tab.root, tab.focused, side);
+    if (other === null) return;
+    if (!swapLeaves(tab.root, tab.focused, other)) return;
+    renderLayout(tab.root, tab.el, { onResize: () => this.refit(tab) });
+    // The two panes traded sizes; refit both (refit marks the whole tab).
+    this.refit(tab);
+    // Re-inserting elements into the DOM drops keyboard focus — hand it back.
+    tab.focused.focus();
+    this.hooks.onGeometry();
   }
 
   // --------------------------------------------------------------- plumbing

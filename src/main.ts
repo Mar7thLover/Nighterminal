@@ -19,6 +19,7 @@ import { chromeInfo, quakeApply, quakeDrop, stateLoad, stateSave } from "./ipc";
 import type { Session } from "./session";
 import { dismissBoot } from "./ui/boot";
 import { revealWindow, wireWindowChrome } from "./ui/chrome";
+import { ConnectPrompt } from "./ui/connect";
 import { CursorGlow } from "./ui/cursor-glow";
 import { HOTKEY_WARNING, SettingsPanel } from "./ui/settings";
 import { TabBar } from "./ui/tabbar";
@@ -45,12 +46,26 @@ const stPanes = need("st-panes");
 
 const glow = new CursorGlow(stage, need("glow-core"), need("glow-halo"));
 const settings = new SettingsPanel(need("app"));
+// SSH panes are plain ConPTY sessions running the system OpenSSH client; the
+// prompt only assembles the argv (see ui/connect.ts for why).
+const connect = new ConnectPrompt(
+  need("app"),
+  (args) =>
+    void workspace.open({
+      layout: { kind: "leaf", shell: "ssh.exe", cwd: null, args },
+    }),
+  () => workspace.focused?.focus(),
+);
 
 const tabs = new TabBar(need("tabs"), need("tab-indicator"), {
   onSelect: (key) => workspace.activate(workspace.find(key) ?? null),
   onClose: (key) => {
     const tab = workspace.find(key);
     if (tab !== undefined) workspace.closeTab(tab);
+  },
+  onReorder: (keys) => {
+    workspace.reorderTabs(keys);
+    scheduleSnapshot();
   },
 });
 
@@ -257,6 +272,8 @@ function matchShortcut(event: KeyboardEvent): (() => void) | null {
     switch (event.code) {
       case "KeyT":
         return () => void workspace.open();
+      case "KeyS":
+        return () => connect.toggle();
       case "KeyW":
         return () => workspace.closeFocused();
       case "KeyD":
@@ -303,6 +320,19 @@ function matchShortcut(event: KeyboardEvent): (() => void) | null {
       const index = Number(digit[1]) - 1;
       return () => workspace.activateIndex(index);
     }
+    // Swap the focused pane with a neighbour — the Ctrl twin of Alt+arrows.
+    // Not Ctrl+Shift+arrows: PSReadLine binds those to select-by-word, and
+    // this app makes a point of not stealing keys the shell uses.
+    switch (event.code) {
+      case "ArrowLeft":
+        return () => workspace.swapSide("left");
+      case "ArrowRight":
+        return () => workspace.swapSide("right");
+      case "ArrowUp":
+        return () => workspace.swapSide("up");
+      case "ArrowDown":
+        return () => workspace.swapSide("down");
+    }
   }
   return null;
 }
@@ -330,12 +360,17 @@ function handleTerminalKey(event: KeyboardEvent): boolean {
 // Same bindings when focus is on the chrome rather than inside a terminal.
 window.addEventListener("keydown", (event) => {
   if (workspace.focused?.term.textarea === document.activeElement) return;
-  // Keys typed into the settings panel are data entry, not commands — without
-  // this, typing in the font field could tear tabs open. The two ways of
-  // closing the panel keep working: Escape, and the same Ctrl+, that opened it.
+  if (event.code === "Escape" && connect.isOpen) {
+    connect.hide();
+    return;
+  }
+  // Keys typed into the settings panel or the SSH prompt are data entry, not
+  // commands — without this, typing in the font field could tear tabs open.
+  // The two ways of closing keep working: Escape, and the same Ctrl+, that
+  // opened the panel.
   if (
     event.target instanceof Element &&
-    event.target.closest("#settings") !== null
+    event.target.closest("#settings, #connect") !== null
   ) {
     if (event.code === "Escape" && settings.isOpen) {
       settings.hide();
@@ -363,6 +398,7 @@ window.addEventListener("keydown", (event) => {
 // ---------------------------------------------------------------------- boot
 
 need("new-tab").addEventListener("click", () => void workspace.open());
+need("open-ssh").addEventListener("click", () => connect.toggle());
 need("open-settings").addEventListener("click", () => settings.toggle());
 
 async function main(): Promise<void> {

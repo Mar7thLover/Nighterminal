@@ -7,6 +7,7 @@ import type { UnlistenFn } from "@tauri-apps/api/event";
 
 import { BackgroundFlattener } from "./ansi/flatten-bg";
 import { config, terminalOverrides, type Config } from "./config";
+import { ligatureRanges } from "./ligatures";
 import { RENDERER, nightfallOptions, nightfallTheme } from "./theme/nightfall";
 import {
   onPtyData,
@@ -37,6 +38,8 @@ export interface SessionHooks {
 /** What survives a restart: enough to put the pane back where it was. */
 export interface SessionSnapshot {
   shell: string | null;
+  /** Extra command-line arguments — an SSH pane's target lives here. */
+  args?: string[] | null;
   cwd: string | null;
 }
 
@@ -58,6 +61,8 @@ export class Session {
    * falls back gracefully.
    */
   private requestedShell: string | null = null;
+  /** Arguments the pane was started with (SSH target etc.), for the snapshot. */
+  private requestedArgs: string[] | null = null;
   title = "shell";
   alive = true;
   /** The shell died within the launch grace period — probably never started. */
@@ -86,6 +91,8 @@ export class Session {
   private disposed = false;
   /** Theme id baked into the current ITheme, to skip no-op retheming. */
   private appliedTheme = config().theme;
+  /** Live character-joiner registration; null while ligatures are off. */
+  private joinerId: number | null = null;
 
   constructor(private readonly hooks: SessionHooks) {
     this.el = document.createElement("div");
@@ -110,6 +117,7 @@ export class Session {
     this.term.open(this.el);
     this.term.loadAddon(new WebLinksAddon());
     this.renderer = this.tryWebgl() ? "webgl" : "dom";
+    this.applyLigatures(config().ligatures);
 
     this.term.onData((data) => {
       if (this.ptyId === null) {
@@ -202,10 +210,12 @@ export class Session {
   async start(restore?: SessionSnapshot): Promise<void> {
     this.fit();
     this.requestedShell = restore?.shell ?? config().shell;
+    this.requestedArgs = restore?.args ?? null;
     let spawned: SpawnResult;
     try {
       spawned = await ptySpawn(this.term.cols, this.term.rows, {
         shell: restore?.shell ?? undefined,
+        args: restore?.args ?? undefined,
         cwd: restore?.cwd ?? undefined,
       });
     } catch (error) {
@@ -229,7 +239,7 @@ export class Session {
 
     this.unlisteners.push(
       await onPtyData(id, (chunk) => this.term.write(this.flattener.push(chunk))),
-      await onPtyExit(id, () => this.handleExit()),
+      await onPtyExit(id, (exitOk) => this.handleExit(exitOk)),
     );
     // Listeners are live — let the backend release what it buffered.
     await ptyAttach(id);
@@ -240,17 +250,27 @@ export class Session {
     }
   }
 
-  private handleExit(): void {
+  private handleExit(exitOk: boolean): void {
     if (!this.alive) return;
     this.alive = false;
-    this.launchFailed = performance.now() - this.spawnedAt < LAUNCH_GRACE_MS;
+    // A command pane (SSH) reports failure through its exit code — a timed-out
+    // connection can take ~21s to die and must still keep its error readable,
+    // while a clean remote logout should close no matter how quick it was.
+    // Shells carry no such signal (`exit 1` is a normal way out), so they keep
+    // the wall-clock heuristic for "it never really started".
+    const isCommand =
+      this.requestedArgs !== null && this.requestedArgs.length > 0;
+    this.launchFailed = isCommand
+      ? !exitOk
+      : performance.now() - this.spawnedAt < LAUNCH_GRACE_MS;
     this.el.classList.add("dead");
     if (this.launchFailed) {
       // SGR 31 rather than a truecolor literal so the line follows the theme.
-      this.term.write(
-        `\r\n\x1b[31m● ${this.shell} exited immediately — ` +
-          `whatever it printed above is the whole story.\x1b[0m\r\n`,
-      );
+      const note = isCommand
+        ? `${this.shell} failed — the output above says why.`
+        : `${this.shell} exited during startup — ` +
+          `whatever it printed above is the whole story.`;
+      this.term.write(`\r\n\x1b[31m● ${note}\x1b[0m\r\n`);
     }
     this.hooks.onExit(this);
   }
@@ -281,7 +301,22 @@ export class Session {
       this.appliedTheme = settings.theme;
       this.term.options.theme = nightfallTheme();
     }
+    this.applyLigatures(settings.ligatures);
     this.fit();
+  }
+
+  /**
+   * Ligatures are a character joiner (see `ligatures.ts`), toggled by keeping
+   * or dropping the registration; xterm repaints affected rows on both.
+   */
+  private applyLigatures(on: boolean): void {
+    if (on === (this.joinerId !== null)) return;
+    if (on) {
+      this.joinerId = this.term.registerCharacterJoiner(ligatureRanges);
+    } else if (this.joinerId !== null) {
+      this.term.deregisterCharacterJoiner(this.joinerId);
+      this.joinerId = null;
+    }
   }
 
   fit(): void {
@@ -304,7 +339,7 @@ export class Session {
     // What this pane was asked to run — the configured default may have
     // changed since, and restoring should bring back what was open. "Auto"
     // stays null so the restore re-probes instead of pinning a probe result.
-    return { shell: this.requestedShell, cwd: this.cwd };
+    return { shell: this.requestedShell, args: this.requestedArgs, cwd: this.cwd };
   }
 
   dispose(): void {

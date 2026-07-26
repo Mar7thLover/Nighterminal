@@ -22,10 +22,11 @@ export function chromeInfo(): Promise<ChromeInfo> {
 export function ptySpawn(
   cols: number,
   rows: number,
-  options: { shell?: string; cwd?: string } = {},
+  options: { shell?: string; args?: string[]; cwd?: string } = {},
 ): Promise<SpawnResult> {
   return invoke<SpawnResult>("pty_spawn", {
     shell: options.shell ?? null,
+    args: options.args ?? null,
     cwd: options.cwd ?? null,
     cols,
     rows,
@@ -64,9 +65,13 @@ export function onPtyData(
   return listen<string>(`pty:data:${id}`, (event) => handle(event.payload));
 }
 
-/** Fires once, after the final output batch, when the shell process is gone. */
-export function onPtyExit(id: string, handle: () => void): Promise<UnlistenFn> {
-  return listen<null>(`pty:exit:${id}`, () => handle());
+/** Fires once, after the final output batch, when the shell process is gone.
+ *  The payload reports whether it exited cleanly (code 0). */
+export function onPtyExit(
+  id: string,
+  handle: (exitOk: boolean) => void,
+): Promise<UnlistenFn> {
+  return listen<boolean>(`pty:exit:${id}`, (event) => handle(event.payload));
 }
 
 // ------------------------------------------------------------------- config

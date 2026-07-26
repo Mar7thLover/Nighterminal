@@ -115,6 +115,13 @@ const SECTIONS: Section[] = [
         set: (v) => ({ cursorBlink: v }),
       },
       {
+        kind: "toggle",
+        label: "连字",
+        hint: "把 => != 这类序列交给字体渲染成连字；需要字体本身支持（Cascadia Code、Fira Code 等）",
+        get: (c) => c.ligatures,
+        set: (v) => ({ ligatures: v }),
+      },
+      {
         kind: "number",
         label: "回滚行数",
         min: 0,
