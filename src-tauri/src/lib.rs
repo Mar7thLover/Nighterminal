@@ -1,4 +1,5 @@
 mod config;
+mod launch;
 mod pty;
 mod quake;
 mod state;
@@ -20,6 +21,25 @@ struct Chrome(Mutex<&'static str>);
 fn chrome_info(chrome: State<'_, Chrome>) -> ChromeInfo {
     ChromeInfo {
         backdrop: *chrome.0.lock().unwrap(),
+    }
+}
+
+/// Tell Windows whether this window is currently a light or a dark surface.
+///
+/// Only the frontend knows: a theme is a CSS block, and its mode is a token in
+/// that block (see `styles/base.css`). Passing the *mode* rather than the theme
+/// id keeps this side free of any palette knowledge, and DWM needs to be told
+/// because the system backdrop tints itself from the window's immersive-dark
+/// flag — a light theme over a dark-tinted acrylic reads as muddy grey.
+#[tauri::command]
+fn chrome_theme(app: tauri::AppHandle, light: bool) {
+    if let Some(main) = app.get_webview_window("main") {
+        let theme = if light {
+            tauri::Theme::Light
+        } else {
+            tauri::Theme::Dark
+        };
+        let _ = main.set_theme(Some(theme));
     }
 }
 
@@ -53,8 +73,12 @@ pub fn run() {
         .manage(pty::PtyState::default())
         .manage(quake::Quake::default())
         .manage(Chrome(Mutex::new(window::SOLID)))
+        // Read here, before anything can chdir: the process working directory
+        // is what `ntps` in a project folder is really passing us.
+        .manage(launch::Launch::detect())
         .invoke_handler(tauri::generate_handler![
             chrome_info,
+            chrome_theme,
             quake_apply,
             quake_drop,
             config::config_get,

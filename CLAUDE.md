@@ -30,7 +30,16 @@ FitAddon 算行列数用的是 **父元素的高度** 减去 **`.xterm` 自身�
 
 TUI 假设终端不透明，会给高亮片段刷一层自己的背景色。Claude Code 实际发的是 `ESC[48;2;0;0;0m`（真彩色纯黑，**不是** SGR 40，所以调 `theme.black` 没有任何用）。黑底终端上这层填充完全看不见 —— 这正是应用想要的效果；半透明终端上它就变成一块实心黑洞。
 
-这个过滤器把**近中性的深色填充**改写成 SGR 49。判据是"每个通道都够暗 **且** 够接近中性"，所以蓝色选中条 `48;2;38;79;120`、暗红报错条这类**有意为之的颜色一律保留**。改阈值前先跑一遍两类样例。
+这个过滤器把**近中性、且与终端底色同侧**的填充改写成 SGR 49。判据是"够接近中性 **且** 够贴近底色那一端"，所以蓝色选中条 `48;2;38;79;120`、暗红报错条这类**有意为之的颜色一律保留**。改阈值前先跑一遍两类样例。
+
+"同侧"由主题决定，构造 `BackgroundFlattener(themeMode())` 时传入，切主题时 `setMode()` 跟着走（`session.ts` 的 `applySettings`）：
+
+- **暗色主题**改写近黑填充（`hi <= 42`）与 SGR 40；
+- **浅色主题**改写近白填充（`lo >= 213`）与 SGR 47。
+
+两条规则**永远不同时开**。浅底下的黑色填充意味着那个 app 认定终端是暗的，它的前景色是照黑底选的 —— 把这块底改成 49，字就掉进浅色背景里没法看了。留着只是一条黑带，难看但能读；正确的解法是让 app 别那么画，也就是下面的 OSC 11。
+
+顺带：`session.ts` 里**接管了 `OSC 10 ; ?` / `OSC 11 ; ?`**（"你的前景/背景是什么颜色"）。xterm 自己会答，但它的 `theme.background` 是全透明黑（tint 是 DOM 层），于是所有 app 都被告知"终端是纯黑的"——三套暗色主题下正好，浅色主题下就是灾难。回答的颜色取自 `--term-bg`，**这个令牌必须跟 `--tint-term-rgb` 保持一致**，它不参与绘制，只用来回答查询和当 flatten 的参照。
 
 它带 `carry` 缓冲是必要的：转义序列会被 PTY 的 8ms 批量切断，跨块的 `ESC[48;2;0;0;0m` 不缓冲就漏改。
 
@@ -54,11 +63,14 @@ shell 打印提示符可能快过前端 `listen()` 注册完成。Rust 侧先把
 
 `src/styles/base.css` 的 `:root` 自定义属性是默认主题，`src/styles/themes.css` 按 `:root[data-theme=…]` 覆盖差异令牌；`theme/nightfall.ts` 用 `getComputedStyle` 读回去构造 xterm 的 `ITheme`。别在 TS 里另写一份颜色常量。
 
-主题相关的三条硬约束：
+主题相关的硬约束：
 
 - **`--term-*` / `--ansi-*` 必须是纯色字面量**（hex 或 rgba）。这些值被 `nightfallTheme()` 读出来交给 xterm 自己解析，xterm 不认 `var()` 间接引用，也不认 `rgb(from …)` 相对色语法 —— 写了不会报错，只会静默变成默认色。界面 CSS 里的派生透明度（`rgb(from var(--accent) r g b / .3)`）不受此限。
-- **不要加浅色主题**。`ansi/flatten-bg.ts` 的判据（见第 4 节）建立在"终端底色是暗的"之上：浅底下 TUI 刷的黑色填充会被改写成浅色而前景仍按黑底选色，TUI 刷的浅色填充又不满足暗色阈值直接漏过。浅色主题需要先重写 flatten 判据，是独立工程。
-- **主题 id 故意不做白名单**（Rust 侧只 trim + 空值回退）。未知 id 匹配不到任何 CSS 规则，级联自动退回默认主题，坏不了；加一个主题只需要改 `themes.css` 和 `settings.ts` 的下拉两处。
+- **`--theme-mode` 是浅色主题的开关总闸**。它同时驱动三件事：flatten 的方向（第 4 节）、`OSC 11` 回答的底色、以及 `applyChrome` 调 `chrome_theme` 给窗口设的 DWM 明暗标志。少写这一条，浅色主题会同时踩三个坑，而且每个都不报错。
+- **DWM 的系统背板按窗口的明暗标志上色**，不按我们的 CSS。所以浅色主题必须调 `chrome_theme(true)`（`main.set_theme(Theme::Light)`），否则亚克力仍按暗色打底，浅色玻璃叠上去是一片灰。Rust 侧只收 `light: bool`，不认识任何主题 id —— 明暗是从 CSS 里读回来的（`themeMode()`），配色仍然只有一个来源。
+- **浅色主题要给 `--tint-term` 加下限**。暗色主题的玻璃浓度可以拉到 0（桌面直接透过来），浅色下那样文字就没有底了；`daybreak` 把整条 `--tint-term` 重定义成 `calc(0.55 + var(--tint-alpha) * 0.45)`，滑杆仍然有实际行程。注意这是**在 CSS 里**重定义，跟下面"别把 `--tint-term` 写成内联样式"不冲突。
+- **主题 id 故意不做白名单**（Rust 侧只 trim + 空值回退）。未知 id 匹配不到任何 CSS 规则，级联自动退回默认主题（因此也自动退回暗色），坏不了；加一个主题只需要改 `themes.css` 和 `settings.ts` 的下拉两处。
+- 主题不只是颜色：`--aurora-opacity` / `--grain-opacity` / `--vignette-alpha` / `--glow-blend` / `--dead-filter` 也归主题管。新增主题时**整套 ANSI 16 一起写**，只覆盖两三个槽位是之前那批主题看着像滤镜而不像设计的原因。
 
 另外主题切换的生效顺序是固定的：`onConfigChange` 里 `applyChrome`（写 `data-theme`）在 `workspace.applySettings()`（`getComputedStyle` 读新值）之前，`getComputedStyle` 会强制同步样式重算，所以读到的一定是新主题。调换这个顺序会读到旧值。
 
@@ -102,6 +114,32 @@ flex item 的 `flex-basis` 默认 `auto`，于是整棵树会缩到文字宽度 
 - 字体没有连字时 join 是视觉无操作，所以开关不需要探测字体、也不需要按字体禁用。
 
 顺带：`pty_spawn` 现在接受 `args`，`-NoLogo` 只在**没有显式 args** 时追加 —— SSH pane 的命令行不是我们的，别去动它。ssh 的选项必须排在 destination **之前**传（`ui/connect.ts` 的 `parseSshTarget` 已保证），排在后面会被 OpenSSH 当成远程命令。
+
+## 13. 启动目录只在进程启动那一刻读一次
+
+`src-tauri/src/launch.rs`：`Launch::detect()` 在 `manage()` 里调用，`pty_spawn` 的目录优先级是 **前端显式传的 > 启动目录 > `config.cwd` > 主目录**。
+
+在 shell 里敲 `ntps` 的意思是"在这里开一个终端"，这是一次明确动作，所以它压过设置里的起始目录；而设置里的起始目录只回答"什么都没指定时开在哪"。
+
+两处容易踩：
+
+- **必须在启动时读**。进程的工作目录不是个可以随时回头查的东西，而且 `pty_spawn` 每次都读会让"当前目录"随便什么东西都能改。
+- **双击 exe / 开始菜单启动要过滤掉**。这类启动继承的是 exe 自己的目录（快捷方式默认的"起始位置"就是目标所在目录），"运行"框和部分启动器给的是 `System32`。不过滤的话，起始目录设置会被一个谁也没指定过的路径永久盖住。比较用小写 + 去尾部分隔符，Windows 路径大小写不敏感。
+
+命令行只认目录：`ntps D:\work`、`ntps -d D:\work`（`--cwd` / `--directory` 同义）。**未知选项跳过而不是报错** —— 这是个 GUI 进程，没有控制台可以抱怨，敲错一个字母也该照常开窗口。
+
+## 14. Ctrl+V 必须自己接管
+
+`main.ts` 的 `matchShortcut` 里有 `case "KeyV"`，别当成多余的删掉。
+
+xterm 把 Ctrl+V 直接翻译成 `\x16` 并 `preventDefault()`（`common/input/Keyboard.ts` 的 a-z 分支），所以**浏览器的 paste 事件根本不会触发**——不接管的话这个键在这个终端里等于没有。
+
+`pasteClipboard()` 的分支是有意的：
+
+- 剪贴板里**有文本** → `term.paste()`，bracketed paste 由 xterm 按 app 的请求决定，多行才不会被逐行执行。
+- **拿不到文本**（只有图片，或 webview 干脆不给读） → 把原始 `\x16` 送下去。图片没有文本形态，而有些 TUI（Claude Code 就是）自己会去读系统剪贴板，它们要的只是"用户按了这个键"这个事实。这条兜底不需要判断剪贴板里到底是什么：送 `\x16` 正是这个键被接管之前的行为，不会比原来更差。
+
+代价是 `\x16` 不再原样到达 shell（vim 的可视块、readline 的 quoted-insert）。这跟 Windows Terminal 的默认绑定一致，是刻意选的。
 
 ## 验证手法
 

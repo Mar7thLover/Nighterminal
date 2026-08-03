@@ -184,19 +184,26 @@ fn build_command(program: &str, args: &[String], cwd: Option<String>) -> Command
 pub fn pty_spawn(
     app: AppHandle,
     state: State<'_, PtyState>,
+    launch: State<'_, crate::launch::Launch>,
     shell: Option<String>,
     args: Option<Vec<String>>,
     cwd: Option<String>,
     cols: u16,
     rows: u16,
 ) -> Result<SpawnResult, String> {
+    let settings = crate::config::load(&app);
     // An explicit shell wins; otherwise the configured one; otherwise probe.
     let program = shell
-        .or_else(|| crate::config::load(&app).shell)
+        .or(settings.shell)
         .filter(|s| !s.trim().is_empty())
         .unwrap_or_else(default_shell);
     let args = args.unwrap_or_default();
-    let cwd = cwd.or_else(|| crate::config::load(&app).cwd);
+    // A pane that knows where it belongs (a split inheriting its origin, a
+    // restored leaf) wins. Failing that, `ntps` typed in a directory means
+    // *this* directory — that is a deliberate act, so it outranks the
+    // configured start directory, which is only the answer for a launch that
+    // named no directory at all.
+    let cwd = cwd.or_else(|| launch.dir()).or(settings.cwd);
 
     let pair = native_pty_system()
         .openpty(PtySize {

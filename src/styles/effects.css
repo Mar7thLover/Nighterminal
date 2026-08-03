@@ -13,7 +13,7 @@
   opacity: 0;
   border-radius: 2px;
   pointer-events: none;
-  mix-blend-mode: screen;
+  mix-blend-mode: var(--glow-blend);
   transition: opacity 0.3s ease;
   will-change: transform;
 }

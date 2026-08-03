@@ -1,6 +1,7 @@
 import type { ITerminalOptions } from "@xterm/xterm";
 
-import { configGet, configSave } from "./ipc";
+import { chromeTheme, configGet, configSave } from "./ipc";
+import { themeMode } from "./theme/surface";
 
 /**
  * Mirrors `src-tauri/src/config.rs` field for field (serde renames to
@@ -101,6 +102,12 @@ export function applyChrome(config: Config): void {
   root.classList.toggle("no-aurora", !config.aurora);
   root.classList.toggle("no-glow", !config.cursorGlow);
   root.style.setProperty("--font-mono", config.fontFamily);
+  // The system backdrop is tinted by the window's light/dark flag, not by us:
+  // a light theme over a dark-flagged acrylic comes out grey. Reading the mode
+  // back from CSS (rather than keeping a list of light theme ids here) keeps
+  // the palette the only place a theme is defined — `data-theme` above has
+  // already landed, and getComputedStyle forces the recalculation.
+  void chromeTheme(themeMode() === "light");
 }
 
 /** The subset of xterm options the settings panel is allowed to drive. */

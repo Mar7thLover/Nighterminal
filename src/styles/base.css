@@ -6,6 +6,12 @@
  * retheming the app means editing only this file.
  * ------------------------------------------------------------------------- */
 :root {
+  /* Which way round this theme is. Read back by `theme/nightfall.ts` (so the
+     ANSI-fill flattener knows which side of the palette counts as "the
+     background") and by `applyChrome` (so DWM tints the system backdrop to
+     match). A theme that forgets this token is treated as dark. */
+  --theme-mode: dark;
+
   /* surfaces — everything is translucent so the OS acrylic reads through.
      The terminal tint is split in two: the colour belongs to the theme, the
      alpha is the user's 玻璃浓度 slider (written inline by applyChrome). */
@@ -21,6 +27,20 @@
   --sheet-lo: rgba(12, 13, 24, 0.92);
   --well-ink: #06070e;
   --boot-hi: #0d0f1c;
+  --scrim: rgba(4, 5, 10, 0.5);
+  --shadow-ink: rgba(0, 0, 0, 0.9);
+
+  /* atmosphere — the parts of the look that are not colour. A theme sets its
+     own weather: how far the aurora comes up, how much film grain sits on the
+     glass, how hard the corners fall off. */
+  --aurora-opacity: 0.9;
+  --grain-opacity: 0.05;
+  --vignette-alpha: 0.5;
+  /* Cursor bloom over a dark surface adds light; over a light one it has to
+     take light away, or it is simply invisible. */
+  --glow-blend: screen;
+  /* What a pane looks like once its shell is gone. */
+  --dead-filter: saturate(0.45) brightness(0.78);
 
   /* hairlines — every rule derives from one ink, so a theme retints them all
      by overriding --hairline-ink alone */
@@ -70,6 +90,11 @@
   --term-cursor-ink: #05060b;
   --term-selection: rgba(94, 242, 255, 0.24);
   --term-selection-dim: rgba(94, 242, 255, 0.12);
+  /* The opaque colour the glass stands in for. Never painted — it is the
+     answer to an app's `OSC 11 ; ?` ("what colour is your background?") and the
+     reference point the fill flattener measures against. Keep it in step with
+     --tint-term-rgb. */
+  --term-bg: #0a0b12;
 
   --radius-win: 10px;
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
@@ -166,7 +191,7 @@ html.no-backdrop #app {
 .aurora {
   position: absolute;
   inset: -35%;
-  opacity: 0.9;
+  opacity: var(--aurora-opacity);
   background:
     radial-gradient(
       38% 30% at 22% 26%,
@@ -207,7 +232,7 @@ html.no-backdrop #app {
 .grain {
   position: absolute;
   inset: 0;
-  opacity: 0.05;
+  opacity: var(--grain-opacity);
   mix-blend-mode: overlay;
   background-size: 180px 180px;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
@@ -219,7 +244,7 @@ html.no-backdrop #app {
   background: radial-gradient(
     120% 100% at 50% 38%,
     rgb(from var(--bg-void) r g b / 0) 32%,
-    rgb(from var(--bg-void) r g b / 0.5) 100%
+    rgb(from var(--bg-void) r g b / var(--vignette-alpha)) 100%
   );
 }
 

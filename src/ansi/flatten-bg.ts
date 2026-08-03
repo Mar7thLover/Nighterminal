@@ -9,27 +9,34 @@
  * hole through the glass.
  *
  * Mapping those fills onto SGR 49 restores the intended appearance. Only
- * near-*neutral* darks are touched, so deliberate colour fills survive: a blue
- * selection band (`48;2;38;79;120`) or a dark red error strip still render.
+ * near-*neutral* fills on the same side as the terminal's own background are
+ * touched, so deliberate colour fills survive: a blue selection band
+ * (`48;2;38;79;120`) or a dark red error strip still render.
+ *
+ * Which side that is comes from the theme. A dark theme flattens near-blacks,
+ * because that is what an app paints when it believes the terminal is dark; a
+ * light theme flattens near-whites, for the same reason in reverse. The two
+ * rules are never both on: on a light surface a black fill is an app that
+ * decided the terminal was dark, and rewriting *that* to 49 would drop its
+ * light-on-black text onto a light background, unreadable. Left alone it is
+ * merely a black band — visible, but legible, and the app can be told (see the
+ * OSC 11 reply in `session.ts`) to stop drawing it.
  *
  * Colon-separated SGR (`48:2::r:g:b`) is left alone — it is rare, and passing
  * it through unchanged is the safe failure mode.
  */
 
-/** A fill this dark on every channel is standing in for the terminal bg. */
-const MAX_CHANNEL = 42;
-/** ...and this close to neutral. Keeps saturated dark fills intact. */
+import type { SurfaceMode } from "../theme/surface";
+
+/** How far from pure black (or pure white) a fill may sit and still be
+ *  standing in for the terminal background. */
+const MARGIN = 42;
+/** ...and how far from neutral. Keeps saturated fills intact. */
 const MAX_SPREAD = 18;
 /** Never stall the stream waiting for an escape that will not arrive. */
 const MAX_CARRY = 64;
 
 const SGR = /\x1b\[([0-9;:]*)m/g;
-
-function isBackgroundFill(r: number, g: number, b: number): boolean {
-  const hi = Math.max(r, g, b);
-  const lo = Math.min(r, g, b);
-  return hi <= MAX_CHANNEL && hi - lo <= MAX_SPREAD;
-}
 
 /** 256-colour index to RGB; null for the 16 palette slots. */
 function palette256(n: number): [number, number, number] | null {
@@ -45,82 +52,16 @@ function palette256(n: number): [number, number, number] | null {
   return null;
 }
 
-function isIndexBackgroundFill(n: number): boolean {
-  // Index 0 is ANSI black, which the theme renders as a near-black navy.
-  if (n === 0) return true;
-  const rgb = palette256(n);
-  return rgb !== null && isBackgroundFill(rgb[0], rgb[1], rgb[2]);
-}
-
-function rewriteParams(params: string): string | null {
-  const parts = params.split(";");
-  const out: string[] = [];
-  let changed = false;
-
-  for (let i = 0; i < parts.length; i++) {
-    const token = parts[i];
-
-    if (token === "48") {
-      const mode = parts[i + 1];
-      if (mode === "2" && i + 4 < parts.length) {
-        const r = Number(parts[i + 2]);
-        const g = Number(parts[i + 3]);
-        const b = Number(parts[i + 4]);
-        if (isBackgroundFill(r, g, b)) {
-          out.push("49");
-          changed = true;
-        } else {
-          out.push("48", "2", parts[i + 2], parts[i + 3], parts[i + 4]);
-        }
-        i += 4;
-        continue;
-      }
-      if (mode === "5" && i + 2 < parts.length) {
-        if (isIndexBackgroundFill(Number(parts[i + 2]))) {
-          out.push("49");
-          changed = true;
-        } else {
-          out.push("48", "5", parts[i + 2]);
-        }
-        i += 2;
-        continue;
-      }
-      out.push(token);
-      continue;
-    }
-
-    // SGR 40 — ANSI black background.
-    if (token === "40") {
-      out.push("49");
-      changed = true;
-      continue;
-    }
-
-    out.push(token);
-  }
-
-  return changed ? out.join(";") : null;
-}
-
-/**
- * Where an incomplete escape sequence begins, or `text.length` if the tail is
- * safe to emit. Without this a `ESC[48;2;0;0;0m` split across two PTY batches
- * would slip through unrewritten.
- */
-function incompleteTail(text: string): number {
-  const esc = text.lastIndexOf("\x1b");
-  if (esc === -1) return text.length;
-  const rest = text.slice(esc);
-  // A finished CSI ends on a byte in @..~.
-  if (/^\x1b\[[0-9;:?<>!]*[@-~]/.test(rest)) return text.length;
-  // A CSI still accumulating its parameters, or a bare ESC.
-  if (/^\x1b\[[0-9;:?<>!]*$/.test(rest) || rest.length === 1) return esc;
-  // Anything else (OSC, charset selection…) — xterm's parser handles partials.
-  return text.length;
-}
-
 export class BackgroundFlattener {
   private carry = "";
+
+  constructor(private mode: SurfaceMode = "dark") {}
+
+  /** Follow a theme switch. The carry buffer is a half-read escape sequence,
+   *  not palette state, so it survives the change untouched. */
+  setMode(mode: SurfaceMode): void {
+    this.mode = mode;
+  }
 
   push(chunk: string): string {
     let text = this.carry + chunk;
@@ -140,8 +81,96 @@ export class BackgroundFlattener {
 
     SGR.lastIndex = 0;
     return text.replace(SGR, (whole, params: string) => {
-      const rewritten = rewriteParams(params);
+      const rewritten = this.rewriteParams(params);
       return rewritten === null ? whole : `\x1b[${rewritten}m`;
     });
   }
+
+  private isBackgroundFill(r: number, g: number, b: number): boolean {
+    const hi = Math.max(r, g, b);
+    const lo = Math.min(r, g, b);
+    if (hi - lo > MAX_SPREAD) return false;
+    return this.mode === "dark" ? hi <= MARGIN : lo >= 255 - MARGIN;
+  }
+
+  private isIndexBackgroundFill(n: number): boolean {
+    // The palette's own ends: black on a dark surface, white on a light one.
+    // Neither resolves through `palette256`, which only covers the cube.
+    if (this.mode === "dark" && n === 0) return true;
+    if (this.mode === "light" && (n === 7 || n === 15)) return true;
+    const rgb = palette256(n);
+    return rgb !== null && this.isBackgroundFill(rgb[0], rgb[1], rgb[2]);
+  }
+
+  /** The named background slot that means "same as the terminal": SGR 40 on a
+   *  dark surface, SGR 47 on a light one. */
+  private get namedFill(): string {
+    return this.mode === "dark" ? "40" : "47";
+  }
+
+  private rewriteParams(params: string): string | null {
+    const parts = params.split(";");
+    const out: string[] = [];
+    let changed = false;
+
+    for (let i = 0; i < parts.length; i++) {
+      const token = parts[i];
+
+      if (token === "48") {
+        const mode = parts[i + 1];
+        if (mode === "2" && i + 4 < parts.length) {
+          const r = Number(parts[i + 2]);
+          const g = Number(parts[i + 3]);
+          const b = Number(parts[i + 4]);
+          if (this.isBackgroundFill(r, g, b)) {
+            out.push("49");
+            changed = true;
+          } else {
+            out.push("48", "2", parts[i + 2], parts[i + 3], parts[i + 4]);
+          }
+          i += 4;
+          continue;
+        }
+        if (mode === "5" && i + 2 < parts.length) {
+          if (this.isIndexBackgroundFill(Number(parts[i + 2]))) {
+            out.push("49");
+            changed = true;
+          } else {
+            out.push("48", "5", parts[i + 2]);
+          }
+          i += 2;
+          continue;
+        }
+        out.push(token);
+        continue;
+      }
+
+      if (token === this.namedFill) {
+        out.push("49");
+        changed = true;
+        continue;
+      }
+
+      out.push(token);
+    }
+
+    return changed ? out.join(";") : null;
+  }
+}
+
+/**
+ * Where an incomplete escape sequence begins, or `text.length` if the tail is
+ * safe to emit. Without this a `ESC[48;2;0;0;0m` split across two PTY batches
+ * would slip through unrewritten.
+ */
+function incompleteTail(text: string): number {
+  const esc = text.lastIndexOf("\x1b");
+  if (esc === -1) return text.length;
+  const rest = text.slice(esc);
+  // A finished CSI ends on a byte in @..~.
+  if (/^\x1b\[[0-9;:?<>!]*[@-~]/.test(rest)) return text.length;
+  // A CSI still accumulating its parameters, or a bare ESC.
+  if (/^\x1b\[[0-9;:?<>!]*$/.test(rest) || rest.length === 1) return esc;
+  // Anything else (OSC, charset selection…) — xterm's parser handles partials.
+  return text.length;
 }

@@ -17,7 +17,8 @@ pnpm tauri build    # 打包到 src-tauri/target/release
 - 多标签页（可拖拽重排），任意嵌套分屏（`Ctrl+Shift+D` 右分 / `Ctrl+Shift+E` 下分，
   `Alt+方向键` 移焦点，`Ctrl+Alt+方向键` 与相邻 pane 换位）
 - SSH 快速连接（`Ctrl+Shift+S`，走系统 OpenSSH——密钥、known_hosts 行为与命令行一致）
-- 五套暗色主题（暗夜 / 樱花 / 抹茶 / 琥珀 / 霓虹玫瑰），终端调色板与界面辉光整套切换
+- 在当前目录打开：`ntps` 在哪个目录敲，新窗口就开在哪个目录；也接受 `ntps D:\work`
+- 四套暗色主题 + 一套浅色（暗夜 / 樱野 / 苔庭 / 琥珀 / 晨白），整套切换终端调色板、辉光、极光与玻璃质感
 - 可选的编程连字（`=>` `!=` 等，需字体本身支持）
 - 设置面板（`Ctrl+,`），改动即时生效并写入 `config.json`
 - 恢复上次会话：标签页顺序、分屏布局、各 pane 的 shell 与工作目录（含 SSH 目标）、窗口几何
@@ -26,6 +27,19 @@ pnpm tauri build    # 打包到 src-tauri/target/release
 
 完整说明（界面各部分、设置逐项、会话恢复与 Quake 的细节）见
 **[docs/使用说明.md](docs/使用说明.md)**。
+
+## 在某个目录打开
+
+把 `nighterminal.exe` 放进 PATH（或改名成 `ntps`），然后：
+
+```sh
+ntps                # 开在当前目录
+ntps D:\work        # 开在指定目录
+ntps -d D:\work     # 同上，--cwd / --directory 也认
+```
+
+命令行给的目录优先于设置里的"起始目录"；双击 exe 或从开始菜单启动时不算数（那时的工作目录是
+exe 自己的目录，不是谁指定的），仍然按设置走。
 
 ## 快捷键
 
@@ -41,8 +55,8 @@ pnpm tauri build    # 打包到 src-tauri/target/release
 | `Ctrl+Tab` / `Ctrl+Shift+Tab` | 下一个 / 上一个标签页 |
 | `Ctrl+(Shift+)PageDown` / `Ctrl+(Shift+)PageUp` | 同上 |
 | `Ctrl+Alt+1`…`9` | 跳到第 N 个标签页 |
-| `Ctrl+Shift+C` | 复制选区 |
-| `Ctrl+V` / `Ctrl+Shift+V` | 粘贴 |
+| `Ctrl+Shift+C` / `Ctrl+Insert` | 复制选区 |
+| `Ctrl+V` / `Ctrl+Shift+V` / `Shift+Insert` | 粘贴 |
 | `Ctrl+,` | 打开 / 关闭设置面板 |
 | `Esc` | 关闭设置面板（面板未开时交给 shell） |
 | 右键 | 有选区则复制，否则粘贴 |
@@ -56,6 +70,8 @@ pnpm tauri build    # 打包到 src-tauri/target/release
 ```
 src/                    前端
   theme/nightfall.ts    从 CSS 变量读出 xterm 配色（配色的唯一来源在 styles/）
+  theme/surface.ts      当前主题是浅色还是暗色（flatten 方向、OSC 11、DWM 明暗都看它）
+  ansi/flatten-bg.ts    把 TUI 刷的"终端底色"填充改写成 SGR 49，别在玻璃上砸洞
   config.ts             配置的类型、加载与应用（默认值和边界在 Rust 侧）
   session.ts            Session：终端实例、PTY 连线、cwd 追踪
   ligatures.ts          编程连字：常见序列表 + character joiner 回调
@@ -76,6 +92,7 @@ src-tauri/
   src/state.rs          state.json：工作区快照（对 Rust 不透明）
   src/quake.rs          全局热键（Win32 RegisterHotKey）与贴顶下拉
   src/window.rs         亚克力毛玻璃 + DWM 圆角
+  src/launch.rs         启动目录与命令行参数（只在进程启动时读一次）
 ```
 
 ## 改配色
@@ -83,7 +100,9 @@ src-tauri/
 设置面板里可以直接切主题。想调整或新增主题：默认配色在 `src/styles/base.css` 的 `:root` 里，各主题在
 `src/styles/themes.css` 里只覆盖与默认不同的令牌；再往 `src/ui/settings.ts` 的主题下拉里加一行选项即可。
 `theme/nightfall.ts` 会把当前生效的 CSS 变量读出来喂给 xterm.js，不需要在 TS 里写任何颜色。
-注意事项（为什么全是暗色系、哪些令牌必须是纯色值）见 [CLAUDE.md](CLAUDE.md)。
+主题不只是颜色：极光浓度、颗粒、暗角、光标辉光的混合模式、死掉的 pane 长什么样，都是主题令牌。
+浅色主题另有三个必须处理的点（`--theme-mode`、`--term-bg`、`--tint-term` 的下限），
+注意事项与哪些令牌必须是纯色值见 [CLAUDE.md](CLAUDE.md)。
 
 ## 配置文件
 

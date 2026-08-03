@@ -224,13 +224,33 @@ async function copySelection(): Promise<void> {
   await navigator.clipboard.writeText(text).catch(() => undefined);
 }
 
+/** What Ctrl+V produces as a keystroke, and what a TUI that reads the clipboard
+ *  itself is waiting for. */
+const CTRL_V = "\x16";
+
+/**
+ * Paste, or hand the keystroke on when the clipboard is holding something this
+ * terminal cannot type.
+ *
+ * Text goes through `term.paste`, which brackets it when the app has asked for
+ * bracketed paste — that is what makes a multi-line paste land in a TUI's
+ * editor as one block instead of a run of Enters.
+ *
+ * With no text to paste — an image on the clipboard, or a webview that refused
+ * to hand it over — the keystroke is forwarded as the raw ^V it would have
+ * been. Some TUIs (Claude Code among them) read the system clipboard
+ * themselves and only need to know the key was pressed; for everyone else this
+ * is exactly what the key did before it was intercepted, so nothing is lost.
+ */
 async function pasteClipboard(): Promise<void> {
   const session = workspace.focused;
   if (session === null || !session.alive) return;
   const text = await navigator.clipboard.readText().catch(() => "");
-  // Route through xterm so bracketed-paste mode is honoured when the shell
-  // has asked for it.
-  if (text.length > 0) session.term.paste(text);
+  if (text.length > 0) {
+    session.term.paste(text);
+    return;
+  }
+  session.send(CTRL_V);
 }
 
 /** Right-click: copy when something is selected, otherwise paste. */
@@ -247,11 +267,22 @@ async function quickClipboard(session: Session): Promise<void> {
 
 /**
  * Matched on `event.code` so the bindings survive non-US keyboard layouts.
- * Deliberately absent: plain Ctrl+C and Ctrl+V — the former must reach the
- * shell as SIGINT, and the latter already arrives as a native paste event that
- * xterm handles itself.
+ *
+ * Ctrl+C is deliberately absent: it has to reach the shell as an interrupt.
+ * Ctrl+V is deliberately *present* — xterm turns it into a plain ^V byte and
+ * cancels the DOM event, so no native paste event ever fires and the key would
+ * otherwise do nothing at all. `pasteClipboard` forwards the ^V anyway in the
+ * one case where the app rather than the terminal should handle it.
  */
 function matchShortcut(event: KeyboardEvent): (() => void) | null {
+  // The X11-era pair, still muscle memory for a lot of people.
+  if (event.shiftKey && !event.altKey && event.code === "Insert") {
+    return event.ctrlKey ? null : () => void pasteClipboard();
+  }
+  if (event.ctrlKey && !event.shiftKey && !event.altKey && event.code === "Insert") {
+    return () => void copySelection();
+  }
+
   if (event.altKey && !event.ctrlKey && !event.shiftKey) {
     switch (event.code) {
       case "ArrowLeft":
@@ -296,6 +327,8 @@ function matchShortcut(event: KeyboardEvent): (() => void) | null {
 
   if (!event.shiftKey && !event.altKey) {
     switch (event.code) {
+      case "KeyV":
+        return () => void pasteClipboard();
       case "Comma":
         return () => settings.toggle();
       case "Tab":

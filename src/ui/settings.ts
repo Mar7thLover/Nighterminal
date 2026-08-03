@@ -35,13 +35,13 @@ const SECTIONS: Section[] = [
       {
         kind: "select",
         label: "主题",
-        hint: "配色整套切换，包括终端调色板与辉光",
+        hint: "整套切换：终端调色板、辉光、极光浓度与玻璃质感",
         options: [
           ["nightfall", "暗夜"],
-          ["sakura", "樱花"],
-          ["matcha", "抹茶"],
+          ["sakura", "樱野"],
+          ["matcha", "苔庭"],
           ["amber", "琥珀"],
-          ["neon-rose", "霓虹玫瑰"],
+          ["daybreak", "晨白（浅色）"],
         ],
         get: (c) => c.theme,
         set: (v) => ({ theme: v }),

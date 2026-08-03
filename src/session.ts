@@ -8,7 +8,14 @@ import type { UnlistenFn } from "@tauri-apps/api/event";
 import { BackgroundFlattener } from "./ansi/flatten-bg";
 import { config, terminalOverrides, type Config } from "./config";
 import { ligatureRanges } from "./ligatures";
-import { RENDERER, nightfallOptions, nightfallTheme } from "./theme/nightfall";
+import {
+  RENDERER,
+  nightfallOptions,
+  nightfallTheme,
+  terminalBackground,
+  terminalForeground,
+} from "./theme/nightfall";
+import { themeMode } from "./theme/surface";
 import {
   onPtyData,
   onPtyExit,
@@ -82,8 +89,9 @@ export class Session {
 
   private readonly fitAddon = new FitAddon();
   private readonly unlisteners: UnlistenFn[] = [];
-  /** Keeps TUI-painted black fills from punching holes through the glass. */
-  private readonly flattener = new BackgroundFlattener();
+  /** Keeps TUI-painted background fills from punching holes through the glass.
+   *  Which fills those are depends on the theme's surface (see flatten-bg). */
+  private readonly flattener = new BackgroundFlattener(themeMode());
   /** Keystrokes that arrive before the pty handshake completes. */
   private pendingInput = "";
   private spawnedAt = 0;
@@ -119,13 +127,7 @@ export class Session {
     this.renderer = this.tryWebgl() ? "webgl" : "dom";
     this.applyLigatures(config().ligatures);
 
-    this.term.onData((data) => {
-      if (this.ptyId === null) {
-        this.pendingInput += data;
-      } else if (this.alive) {
-        void ptyWrite(this.ptyId, data);
-      }
-    });
+    this.term.onData((data) => this.send(data));
 
     // Fires only when the grid genuinely changes, so this never spams ConPTY.
     this.term.onResize(({ cols, rows }) => {
@@ -148,6 +150,7 @@ export class Session {
     });
 
     this.watchDirectory();
+    this.answerColorQueries();
 
     // Mousedown rather than click, and on the pane rather than the textarea, so
     // the padding around the grid also claims focus.
@@ -187,6 +190,42 @@ export class Session {
       }
       // Not consumed: other handlers may still want the notification forms.
       return false;
+    });
+  }
+
+  /**
+   * Answer `OSC 10 ; ?` / `OSC 11 ; ?` — "what colour is your foreground /
+   * background?" — with the theme's colours.
+   *
+   * xterm would answer these itself, but its `theme.background` is fully
+   * transparent black (the tint is a DOM layer), so every app would be told the
+   * terminal is pitch black and pick its dark palette. That is right for three
+   * of the four themes and wrong for the light one, where it is the difference
+   * between a TUI drawing dark-on-light and drawing white-on-black bands.
+   * Returning true consumes the query so xterm's own reply never runs.
+   */
+  private answerColorQueries(): void {
+    const reply = (index: number, rgb: [number, number, number]): void => {
+      const part = (v: number): string =>
+        Math.max(0, Math.min(255, Math.round(v)))
+          .toString(16)
+          .padStart(2, "0")
+          .repeat(2); // xterm's own format: 16 bits per channel.
+      this.send(
+        `\x1b]${index};rgb:${part(rgb[0])}/${part(rgb[1])}/${part(rgb[2])}\x1b\\`,
+      );
+    };
+
+    this.term.parser.registerOscHandler(10, (payload) => {
+      if (payload !== "?") return false;
+      reply(10, terminalForeground());
+      return true;
+    });
+
+    this.term.parser.registerOscHandler(11, (payload) => {
+      if (payload !== "?") return false;
+      reply(11, terminalBackground());
+      return true;
     });
   }
 
@@ -300,6 +339,9 @@ export class Session {
     if (settings.theme !== this.appliedTheme) {
       this.appliedTheme = settings.theme;
       this.term.options.theme = nightfallTheme();
+      // Dark and light surfaces flatten opposite ends of the palette; a switch
+      // that left the flattener behind would punch holes in the new theme.
+      this.flattener.setMode(themeMode());
     }
     this.applyLigatures(settings.ligatures);
     this.fit();
@@ -316,6 +358,21 @@ export class Session {
     } else if (this.joinerId !== null) {
       this.term.deregisterCharacterJoiner(this.joinerId);
       this.joinerId = null;
+    }
+  }
+
+  /**
+   * Feed bytes to the shell as if they had been typed. Everything the user
+   * types arrives here, and so does anything the app synthesises (the raw ^V a
+   * TUI wants when the clipboard holds an image).
+   */
+  send(data: string): void {
+    if (this.ptyId === null) {
+      // The pty handshake is still in flight; nothing is lost, it goes out in
+      // `start()` as soon as there is somewhere to write to.
+      this.pendingInput += data;
+    } else if (this.alive) {
+      void ptyWrite(this.ptyId, data);
     }
   }
 

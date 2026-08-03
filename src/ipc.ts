@@ -19,6 +19,12 @@ export function chromeInfo(): Promise<ChromeInfo> {
   return invoke<ChromeInfo>("chrome_info");
 }
 
+/** Tell DWM whether the window is currently a light or a dark surface, so the
+ *  system backdrop tints itself to match the theme rather than against it. */
+export function chromeTheme(light: boolean): Promise<void> {
+  return invoke("chrome_theme", { light });
+}
+
 export function ptySpawn(
   cols: number,
   rows: number,

@@ -2,162 +2,268 @@
  * Colour themes.
  *
  * `applyChrome` stamps the config's theme id onto `<html data-theme=…>`; each
- * block below overrides only what differs from the nightfall defaults in
- * base.css — the cascade supplies the rest. An unknown id matches nothing and
- * falls back to nightfall wholesale, which is why the id is not whitelisted
- * anywhere.
+ * block below overrides what differs from the nightfall defaults in base.css —
+ * the cascade supplies the rest. An unknown id matches nothing and falls back
+ * to nightfall wholesale, which is why the id is not whitelisted anywhere.
  *
- * Every theme here is a *dark* variant on purpose: `src/ansi/flatten-bg.ts`
- * only rewrites near-black TUI fills, so a light surface would need a whole
- * different flattening rule before it could work (see CLAUDE.md §4).
+ * A theme is not only a palette. Each one also sets its own weather —
+ * --aurora-opacity, --grain-opacity, --vignette-alpha — because the same glass
+ * under a different colour needs a different amount of atmosphere to read as
+ * deliberate rather than tinted.
  *
- * The --term-* / --ansi-* values are read back by theme/nightfall.ts and
- * parsed by xterm itself: plain colours only, no var() and no rgb(from …).
+ * Every theme carries a *complete* ANSI 16 rather than patching two or three
+ * slots: a half-overridden palette is what makes a theme look like a filter
+ * instead of a design, and it is how you end up with a green terminal that
+ * still prints blue-grey diffs.
+ *
+ * Three rules:
+ *  - The --term-* / --ansi-* values are read back by theme/nightfall.ts and
+ *    parsed by xterm itself: plain colours only, no var() and no rgb(from …).
+ *  - --term-bg is the opaque colour the glass stands in for. It is never
+ *    painted; it answers `OSC 11 ; ?` and anchors the fill flattener. Keep it
+ *    in step with --tint-term-rgb.
+ *  - --theme-mode decides which side of the palette counts as "background"
+ *    (see src/ansi/flatten-bg.ts) and which way DWM tints the backdrop.
  * ------------------------------------------------------------------------- */
 
-/* 樱花 — warm plum glass, pink signature. */
+/* 樱野 — warm plum glass, pink signature, the softest air of the set. */
 :root[data-theme="sakura"] {
-  --bg-void: #0b0609;
-  --bg-deep: #120a10;
-  --tint-term-rgb: 18 10 16;
-  --tint-bar: rgba(36, 20, 32, 0.46);
-  --tint-bar-fade: rgba(20, 11, 18, 0.24);
-  --tint-status: rgba(14, 8, 13, 0.4);
-  --sheet-hi: rgba(42, 24, 38, 0.9);
-  --sheet-lo: rgba(22, 12, 20, 0.92);
-  --well-ink: #0e070c;
-  --boot-hi: #1a0d17;
+  --bg-void: #0b0710;
+  --bg-deep: #130c15;
+  --tint-term-rgb: 20 12 22;
+  --tint-bar: rgba(38, 22, 42, 0.46);
+  --tint-bar-fade: rgba(21, 12, 24, 0.24);
+  --tint-status: rgba(16, 9, 18, 0.4);
+  --sheet-hi: rgba(44, 26, 48, 0.9);
+  --sheet-lo: rgba(22, 13, 25, 0.92);
+  --well-ink: #0d0710;
+  --boot-hi: #1b0f1e;
+  --scrim: rgba(10, 5, 12, 0.5);
 
-  --hairline-ink: #e0a0c4;
+  --aurora-opacity: 0.85;
+  --grain-opacity: 0.042;
+  --vignette-alpha: 0.44;
 
-  --fg: #f0dce8;
-  --fg-dim: #a98a9e;
-  --fg-mute: #715b67;
+  --hairline-ink: #e2a6cd;
 
-  --accent: #ff8fc7;
-  --accent-2: #c48bff;
-  --accent-3: #ff8f9e;
-  --accent-ok: #8fe8b0;
+  --fg: #f0e0ec;
+  --fg-dim: #ad93a8;
+  --fg-mute: #746171;
 
-  --term-fg: #f0dce8;
-  --term-cursor: #ff8fc7;
-  --term-selection: rgba(255, 143, 199, 0.24);
-  --term-selection-dim: rgba(255, 143, 199, 0.12);
-  --ansi-red: #ff6b88;
-  --ansi-green: #7deb9f;
-  --ansi-yellow: #ffd08f;
-  --ansi-blue: #8fa8ff;
-  --ansi-magenta: #ff8fc7;
-  --ansi-cyan: #8fd8ef;
-  --ansi-white: #ecd8e4;
-  --ansi-bright-magenta: #ffb3d9;
-  --ansi-bright-cyan: #b3e8f7;
+  --accent: #ff9ecd;
+  --accent-2: #b98cff;
+  --accent-3: #ffb08c;
+  --accent-ok: #93e2b4;
+  --danger: #ff6f86;
+
+  --ansi-black: #1d1421;
+  --ansi-red: #ff7d92;
+  --ansi-green: #8ddfa8;
+  --ansi-yellow: #f3cd8a;
+  --ansi-blue: #9db0ef;
+  --ansi-magenta: #f79ad3;
+  --ansi-cyan: #8ed4dc;
+  --ansi-white: #ded0da;
+  --ansi-bright-black: #4a3b50;
+  --ansi-bright-red: #ff9dab;
+  --ansi-bright-green: #a9ecc0;
+  --ansi-bright-yellow: #ffe0a8;
+  --ansi-bright-blue: #bbc9ff;
+  --ansi-bright-magenta: #ffb8e4;
+  --ansi-bright-cyan: #b1ebf0;
+  --ansi-bright-white: #fbf0f7;
+
+  --term-fg: #f0e0ec;
+  --term-cursor: #ff9ecd;
+  --term-cursor-ink: #150c17;
+  --term-selection: rgba(255, 158, 205, 0.24);
+  --term-selection-dim: rgba(255, 158, 205, 0.12);
+  --term-bg: #130c15;
 }
 
-/* 抹茶 — green tea over dark moss. */
+/* 苔庭 — green tea over dark moss; the quietest theme, so the least aurora. */
 :root[data-theme="matcha"] {
-  --bg-void: #060b08;
-  --bg-deep: #0a120d;
-  --tint-term-rgb: 9 17 12;
-  --tint-bar: rgba(20, 36, 26, 0.46);
-  --tint-bar-fade: rgba(11, 20, 14, 0.24);
-  --tint-status: rgba(8, 15, 10, 0.4);
-  --sheet-hi: rgba(24, 42, 30, 0.9);
-  --sheet-lo: rgba(12, 22, 15, 0.92);
-  --well-ink: #060e09;
-  --boot-hi: #0d1a11;
+  --bg-void: #050b08;
+  --bg-deep: #0a110d;
+  --tint-term-rgb: 10 18 14;
+  --tint-bar: rgba(22, 38, 28, 0.46);
+  --tint-bar-fade: rgba(12, 21, 15, 0.24);
+  --tint-status: rgba(9, 16, 11, 0.4);
+  --sheet-hi: rgba(26, 44, 32, 0.9);
+  --sheet-lo: rgba(13, 23, 17, 0.92);
+  --well-ink: #071009;
+  --boot-hi: #0e1c13;
+  --scrim: rgba(4, 10, 6, 0.5);
 
-  --hairline-ink: #9ed4ae;
+  --aurora-opacity: 0.7;
+  --grain-opacity: 0.055;
+  --vignette-alpha: 0.52;
 
-  --fg: #dcf0e2;
-  --fg-dim: #8aa992;
-  --fg-mute: #5b7263;
+  --hairline-ink: #a3d4b0;
 
-  --accent: #8fe6a0;
-  --accent-2: #d8e68f;
-  --accent-3: #5ecfc0;
-  --accent-ok: #8fe6a0;
+  --fg: #dceadd;
+  --fg-dim: #8fa895;
+  --fg-mute: #5e7365;
 
-  --term-fg: #dcf0e2;
-  --term-cursor: #8fe6a0;
-  --term-selection: rgba(143, 230, 160, 0.24);
-  --term-selection-dim: rgba(143, 230, 160, 0.12);
-  --ansi-green: #8fe6a0;
-  --ansi-yellow: #e6d88f;
-  --ansi-blue: #7fa8d8;
-  --ansi-magenta: #b89fd8;
-  --ansi-cyan: #7fdec8;
-  --ansi-white: #d4e6d8;
-  --ansi-bright-green: #b3f0be;
-  --ansi-bright-cyan: #a8ecdc;
+  --accent: #8fdc9b;
+  --accent-2: #cfe08a;
+  --accent-3: #6fd6c0;
+  --accent-ok: #8fdc9b;
+  --danger: #ef7a86;
+
+  --ansi-black: #14201a;
+  --ansi-red: #e8848a;
+  --ansi-green: #93d986;
+  --ansi-yellow: #d8c87e;
+  --ansi-blue: #86b4cf;
+  --ansi-magenta: #b79ad1;
+  --ansi-cyan: #7dd0bd;
+  --ansi-white: #cddfd0;
+  --ansi-bright-black: #3f5245;
+  --ansi-bright-red: #f5a0a4;
+  --ansi-bright-green: #b1e8a6;
+  --ansi-bright-yellow: #ece0a0;
+  --ansi-bright-blue: #a6cee4;
+  --ansi-bright-magenta: #d0b8e6;
+  --ansi-bright-cyan: #a2e4d5;
+  --ansi-bright-white: #eef6ef;
+
+  --term-fg: #dceadd;
+  --term-cursor: #8fdc9b;
+  --term-cursor-ink: #06110a;
+  --term-selection: rgba(143, 220, 155, 0.22);
+  --term-selection-dim: rgba(143, 220, 155, 0.11);
+  --term-bg: #0a110d;
 }
 
-/* 琥珀 — ember light held in dark resin. */
+/* 琥珀 — ember light held in dark resin; warm grain, deep falloff. */
 :root[data-theme="amber"] {
-  --bg-void: #0c0806;
-  --bg-deep: #120d08;
-  --tint-term-rgb: 18 13 8;
-  --tint-bar: rgba(38, 28, 18, 0.46);
-  --tint-bar-fade: rgba(22, 15, 10, 0.24);
-  --tint-status: rgba(16, 11, 7, 0.4);
-  --sheet-hi: rgba(44, 32, 20, 0.9);
-  --sheet-lo: rgba(24, 16, 10, 0.92);
-  --well-ink: #0e0a06;
-  --boot-hi: #1a1309;
+  --bg-void: #0b0704;
+  --bg-deep: #120c07;
+  --tint-term-rgb: 18 12 7;
+  --tint-bar: rgba(40, 28, 18, 0.46);
+  --tint-bar-fade: rgba(23, 15, 9, 0.24);
+  --tint-status: rgba(17, 11, 6, 0.4);
+  --sheet-hi: rgba(46, 32, 20, 0.9);
+  --sheet-lo: rgba(23, 16, 9, 0.92);
+  --well-ink: #0e0904;
+  --boot-hi: #1d1409;
+  --scrim: rgba(10, 6, 3, 0.5);
 
-  --hairline-ink: #e6c896;
+  --aurora-opacity: 0.8;
+  --grain-opacity: 0.06;
+  --vignette-alpha: 0.54;
 
-  --fg: #f0e8d8;
-  --fg-dim: #a99a82;
-  --fg-mute: #71624e;
+  --hairline-ink: #e8c898;
 
-  --accent: #ffc25e;
-  --accent-2: #ff8f5e;
-  --accent-3: #ffe08c;
-  --accent-ok: #b8e65e;
+  --fg: #f2e5d3;
+  --fg-dim: #ac9a81;
+  --fg-mute: #74644e;
 
-  --term-fg: #f0e8d8;
-  --term-cursor: #ffc25e;
-  --term-selection: rgba(255, 194, 94, 0.24);
-  --term-selection-dim: rgba(255, 194, 94, 0.12);
-  --ansi-red: #ff7a5e;
-  --ansi-green: #b8e65e;
-  --ansi-yellow: #ffc25e;
-  --ansi-blue: #9db3e6;
-  --ansi-magenta: #d89fb3;
-  --ansi-cyan: #a8d8c8;
-  --ansi-white: #e8ddc8;
-  --ansi-bright-yellow: #ffd88c;
+  --accent: #ffbe63;
+  --accent-2: #ff9159;
+  --accent-3: #ffdb96;
+  --accent-ok: #b6d86a;
+  --danger: #ff6a52;
+
+  --ansi-black: #1e160e;
+  --ansi-red: #f2785e;
+  --ansi-green: #b6d86a;
+  --ansi-yellow: #ffbe63;
+  --ansi-blue: #93b1d6;
+  --ansi-magenta: #d095b3;
+  --ansi-cyan: #86ccbe;
+  --ansi-white: #e4d7c2;
+  --ansi-bright-black: #55452f;
+  --ansi-bright-red: #ff9b83;
+  --ansi-bright-green: #cde98a;
+  --ansi-bright-yellow: #ffd792;
+  --ansi-bright-blue: #b3cbe8;
+  --ansi-bright-magenta: #e5b2cb;
+  --ansi-bright-cyan: #a6e0d3;
+  --ansi-bright-white: #fbf2e4;
+
+  --term-fg: #f2e5d3;
+  --term-cursor: #ffbe63;
+  --term-cursor-ink: #120c07;
+  --term-selection: rgba(255, 190, 99, 0.22);
+  --term-selection-dim: rgba(255, 190, 99, 0.11);
+  --term-bg: #120c07;
 }
 
-/* 霓虹玫瑰 — hot pink first, the old cyan demoted to a partner. */
-:root[data-theme="neon-rose"] {
-  --bg-void: #0c060a;
-  --bg-deep: #120a10;
-  --tint-term-rgb: 18 9 15;
-  --tint-bar: rgba(38, 18, 34, 0.46);
-  --tint-bar-fade: rgba(20, 10, 18, 0.24);
-  --tint-status: rgba(15, 8, 14, 0.4);
-  --sheet-hi: rgba(44, 22, 40, 0.9);
-  --sheet-lo: rgba(24, 12, 22, 0.92);
-  --well-ink: #0e060c;
-  --boot-hi: #1c0d18;
+/* ---------------------------------------------------------------------------
+ * 晨白 — the light one.
+ *
+ * Everything here that is not a colour exists because a light surface is not a
+ * dark one with the numbers flipped:
+ *  - --theme-mode: light retargets the fill flattener (near-*white* fills are
+ *    what a light-aware TUI paints as "background") and asks DWM for a light
+ *    backdrop, so the system acrylic stops tinting the glass grey.
+ *  - --tint-term keeps a floor under the user's 玻璃浓度 slider. At the dark
+ *    themes' 0 the desktop reads straight through, which on white leaves the
+ *    text with nothing to sit on; the slider still spans a real range above it.
+ *  - The bloom switches to `multiply`: screen over white is invisible.
+ *  - --bg-void is a warm shadow rather than a near-black, because it is only
+ *    ever used to fall off the corners.
+ * ------------------------------------------------------------------------- */
+:root[data-theme="daybreak"] {
+  --theme-mode: light;
 
-  --hairline-ink: #e696c8;
+  --bg-void: #b9b2a4;
+  --bg-deep: #f2f0ea;
+  --tint-term-rgb: 250 249 245;
+  --tint-term: rgb(var(--tint-term-rgb) / calc(0.55 + var(--tint-alpha) * 0.45));
+  --tint-bar: rgba(252, 251, 247, 0.62);
+  --tint-bar-fade: rgba(244, 242, 236, 0.34);
+  --tint-status: rgba(248, 246, 241, 0.5);
+  --sheet-hi: rgba(253, 252, 249, 0.94);
+  --sheet-lo: rgba(240, 238, 231, 0.95);
+  --well-ink: #ffffff;
+  --boot-hi: #ffffff;
+  --scrim: rgba(60, 56, 48, 0.26);
+  --shadow-ink: rgba(60, 54, 44, 0.4);
 
-  --fg: #f0d8e8;
-  --fg-dim: #a9829b;
-  --fg-mute: #714e64;
+  --aurora-opacity: 0.5;
+  --grain-opacity: 0.028;
+  --vignette-alpha: 0.35;
+  --glow-blend: multiply;
+  --dead-filter: saturate(0.35) contrast(0.85) brightness(1.04);
 
-  --accent: #ff5ec4;
-  --accent-2: #5ef2ff;
-  --accent-3: #a06bff;
+  --hairline-ink: #5b6472;
+  --line: rgb(from var(--hairline-ink) r g b / 0.18);
+  --line-strong: rgb(from var(--hairline-ink) r g b / 0.3);
 
-  --term-fg: #f0d8e8;
-  --term-cursor: #ff5ec4;
-  --term-selection: rgba(255, 94, 196, 0.24);
-  --term-selection-dim: rgba(255, 94, 196, 0.12);
-  --ansi-magenta: #ff5ec4;
-  --ansi-bright-magenta: #ff8fd9;
-  --ansi-white: #e8d4e0;
+  --fg: #2f333b;
+  --fg-dim: #626a76;
+  --fg-mute: #949cab;
+
+  --accent: #1f7ae0;
+  --accent-2: #7a5bd6;
+  --accent-3: #d2557f;
+  --accent-ok: #1f9d5b;
+  --danger: #d24a4a;
+
+  --ansi-black: #3a3f47;
+  --ansi-red: #c04038;
+  --ansi-green: #2b8a54;
+  --ansi-yellow: #9a6b12;
+  --ansi-blue: #2266cc;
+  --ansi-magenta: #8442b8;
+  --ansi-cyan: #157f86;
+  --ansi-white: #cfcbc2;
+  --ansi-bright-black: #6d7480;
+  --ansi-bright-red: #db5548;
+  --ansi-bright-green: #35a366;
+  --ansi-bright-yellow: #b8862a;
+  --ansi-bright-blue: #3d82e0;
+  --ansi-bright-magenta: #9a5ccc;
+  --ansi-bright-cyan: #1f9aa2;
+  --ansi-bright-white: #f7f5f0;
+
+  --term-fg: #2f333b;
+  --term-cursor: #1f7ae0;
+  --term-cursor-ink: #ffffff;
+  --term-selection: rgba(31, 122, 224, 0.2);
+  --term-selection-dim: rgba(31, 122, 224, 0.1);
+  --term-bg: #f7f5f0;
 }

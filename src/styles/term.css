@@ -152,6 +152,6 @@ html.resizing-y * {
 
 /* A shell that exited stays readable but visibly inert. */
 .pane.dead .xterm {
-  filter: saturate(0.45) brightness(0.78);
+  filter: var(--dead-filter);
   transition: filter 0.4s ease;
 }

@@ -1,18 +1,43 @@
 import type { ITerminalOptions, ITheme } from "@xterm/xterm";
 
 import { terminalOverrides, type Config } from "../config";
+import { cssVar } from "./surface";
 
-/**
+/*
  * The palette lives in `styles/base.css` as custom properties; this module
  * reads it back rather than restating it, so there is exactly one place to edit
  * when retheming. Values are resolved lazily — by the time the first Terminal
  * is constructed the stylesheet is always applied, in dev and in a bundle.
  */
-function cssVar(name: string, fallback: string): string {
-  const value = getComputedStyle(document.documentElement)
-    .getPropertyValue(name)
-    .trim();
-  return value.length > 0 ? value : fallback;
+
+/**
+ * The opaque colour the glass stands in for, as `[r, g, b]`.
+ *
+ * xterm's own `theme.background` is fully transparent — the tint is a DOM layer
+ * — so it cannot answer an app asking what colour the background is. This can.
+ */
+export function terminalBackground(): [number, number, number] {
+  return parseHex(cssVar("--term-bg", "#0a0b12")) ?? [10, 11, 18];
+}
+
+/** The theme's foreground, for the matching `OSC 10 ; ?` reply. */
+export function terminalForeground(): [number, number, number] {
+  return parseHex(cssVar("--term-fg", "#d8def0")) ?? [216, 222, 240];
+}
+
+function parseHex(value: string): [number, number, number] | null {
+  const match = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(value);
+  if (match === null) return null;
+  const hex = match[1];
+  const wide =
+    hex.length === 3
+      ? hex.split("").map((c) => c + c).join("")
+      : hex;
+  return [
+    parseInt(wide.slice(0, 2), 16),
+    parseInt(wide.slice(2, 4), 16),
+    parseInt(wide.slice(4, 6), 16),
+  ];
 }
 
 export function nightfallTheme(): ITheme {
